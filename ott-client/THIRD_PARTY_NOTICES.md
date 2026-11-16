@@ -49,6 +49,8 @@ author) before a commercial launch.
 | `src/components/stream/curved-lens-carousel.tsx` | 3D Curved Carousel | kedhareswer |
 | `src/components/stream/chapter-hero.tsx` | Scroll-Triggered Video Hero | daiwiikharihar |
 | `src/components/motion/use-hide-on-scroll.ts` | Hide On Scroll (its useHideOnScroll hook) | ddoemonn |
+| `src/components/stream/glass-select.tsx` | Liquid Select | liquefy-ui |
+| `src/components/stream/animated-chips.tsx` | Animated Tags | socolled |
 
 ## Fonts
 

@@ -17,13 +17,9 @@ import {
   Tv,
   WandSparkles,
 } from 'lucide-react'
-import { tmdbImage, youtubeWatchUrl } from '@/lib/tmdb-image'
+import { tmdbImage } from '@/lib/tmdb-image'
 import { cn } from '@/lib/utils'
 import { useMotion, useScrollProgress } from '@/components/motion'
-import {
-  CoverflowCarousel,
-  type CoverflowItem,
-} from '@/components/stream/coverflow-carousel'
 import { EndlessCorridor } from '@/components/stream/endless-corridor'
 import {
   FilmstripHero,
@@ -33,10 +29,9 @@ import {
   InteractiveSelector,
   type SelectorItem,
 } from '@/components/stream/interactive-selector'
-import { LandscapeRail } from '@/components/stream/landscape-rail'
 import { SectionHeader } from '@/components/stream/section-header'
-import { TopTenRail } from '@/components/stream/top-ten-rail'
 import { HeroAtmosphere } from '@/components/three/hero-atmosphere'
+import { RailsView } from '@/features/browse/rails-view'
 import { useGetTitlesQuery } from '@/features/catalog/catalog-api'
 import { HOME_QUERIES } from './queries'
 
@@ -44,11 +39,6 @@ const TYPE_LABEL = { movie: 'Movie', series: 'Series', reality: 'Reality' }
 
 const clip = (text: string, max: number) =>
   text.length > max ? text.slice(0, text.lastIndexOf(' ', max)) + '…' : text
-
-const meta = (t: TitleCard) =>
-  [t.year, t.rating ? `${t.rating.toFixed(1)} ★` : null, t.genres[0]?.name]
-    .filter(Boolean)
-    .join(' · ')
 
 const featurable = (list: TitleCard[]) =>
   list.filter((t) => t.backdropUrl && t.posterUrl)
@@ -65,15 +55,6 @@ const toHeroItem = (t: TitleCard): FilmstripItem => ({
     t.genres[0]?.name ?? '',
   ].filter(Boolean),
   overview: clip(t.overview, 160),
-})
-
-const toCoverflowItem = (t: TitleCard): CoverflowItem => ({
-  id: t.id,
-  title: t.title,
-  subtitle: meta(t),
-  image: tmdbImage(t.posterUrl, 'w500'),
-  description: t.overview,
-  trailerUrl: youtubeWatchUrl(t.trailerKey),
 })
 
 /** An icon per genre for the mood selector; matched on the genre slug */
@@ -173,11 +154,6 @@ export function Home() {
     ...featurable(reality).slice(0, 1),
   ].map(toHeroItem)
 
-  const trending = movies
-    .filter((t) => t.posterUrl)
-    .slice(0, 10)
-    .map(toCoverflowItem)
-
   const pool = [...movies, ...series, ...reality, ...topRated].filter(
     (t, i, all) => all.findIndex((u) => u.id === t.id) === i
   )
@@ -257,104 +233,46 @@ export function Home() {
           aria-hidden='true'
           className='h-[14svh] bg-gradient-to-b from-transparent to-background'
         />
-        <div className='overflow-hidden bg-background'>
-          {/* 01: Trending, as a coverflow */}
-          <section
-            className='relative pt-10 md:pt-16'
-            aria-labelledby='band-trending'
-          >
-            <Glow tone={2} className='top-24' />
-            <div id='band-trending' className='relative'>
-              <SectionHeader
-                index='01'
-                eyebrow='Trending now'
-                title='The films everyone is watching'
-                description='Swipe through this week’s most watched. Pick the front poster to play its trailer.'
-                action={{ label: 'All movies', to: '/movies' }}
-              />
-            </div>
-            {trending.length > 0 && (
-              <CoverflowCarousel
-                items={trending}
-                label='Trending movies'
-                initialIndex={2}
-                className='mt-4'
-                style={{ height: '78svh', minHeight: 520, maxHeight: 820 }}
-              />
-            )}
-          </section>
-
-          {/* 02: Top 10 */}
-          <section
-            className='relative py-20 md:py-28'
-            aria-labelledby='band-top10'
-          >
-            <div id='band-top10'>
-              <SectionHeader
-                index='02'
-                eyebrow='Top 10'
-                title='Series topping the charts'
-                action={{ label: 'All series', to: '/series' }}
-              />
-            </div>
-            <TopTenRail titles={series} label='Top 10 series' />
-          </section>
-
-          {/* 03: Moods, as an interactive selector */}
-          <section
-            className='relative py-12 md:py-20'
-            aria-labelledby='band-moods'
-          >
-            <Glow tone={1} className='top-10' />
-            <div id='band-moods' className='relative'>
-              <SectionHeader
-                index='03'
-                eyebrow='Moods'
-                title='What are you in the mood for?'
-                description='Open a mood to see what is playing in it tonight.'
-              />
-            </div>
-            {moods.length >= 3 && (
-              <div className='relative shell mt-10'>
-                <InteractiveSelector items={moods} label='Moods' />
-              </div>
-            )}
-          </section>
-
-          {/* interlude: the endless corridor */}
-          {corridor.length >= 8 && (
-            <EndlessCorridor
-              images={corridor}
-              title='Stories without borders'
-              caption={`${catalogSize ? `${catalogSize} titles` : 'Hundreds of titles'} from fourteen languages: films, series and reality, all in one place.`}
-              className='my-8'
-            >
-              <Link
-                to='/movies'
-                className='inline-flex h-12 items-center rounded-full bg-primary px-7 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90'
-              >
-                Start exploring
-              </Link>
-            </EndlessCorridor>
-          )}
-
-          {/* 04: Reality, as wide cinematic cards */}
-          <section
-            className='relative py-20 md:py-28'
-            aria-labelledby='band-reality'
-          >
-            <Glow tone={3} className='top-0' />
-            <div id='band-reality' className='relative'>
-              <SectionHeader
-                index='04'
-                eyebrow='Reality'
-                title='Unscripted and unmissable'
-                description='Competitions, adventures and real lives from around the world.'
-                action={{ label: 'All reality', to: '/reality' }}
-              />
-            </div>
-            <LandscapeRail titles={reality} label='Reality shows' />
-          </section>
+        <div className='overflow-hidden bg-background pt-2 pb-16'>
+          {/* the rails (one request), with two editorial interludes between them */}
+          <RailsView
+            page='home'
+            interludes={{
+              'most-watched': moods.length >= 3 && (
+                <section
+                  className='relative py-16 md:py-24'
+                  aria-labelledby='band-moods'
+                >
+                  <Glow tone={1} className='top-10' />
+                  <div id='band-moods' className='relative'>
+                    <SectionHeader
+                      eyebrow='Moods'
+                      title='What are you in the mood for?'
+                      description='Open a mood to see what is playing in it tonight.'
+                    />
+                  </div>
+                  <div className='relative shell mt-10'>
+                    <InteractiveSelector items={moods} label='Moods' />
+                  </div>
+                </section>
+              ),
+              'award-winners': corridor.length >= 8 && (
+                <EndlessCorridor
+                  images={corridor}
+                  title='Stories without borders'
+                  caption={`${catalogSize ? `${catalogSize} titles` : 'Hundreds of titles'} from fourteen languages: films, series and reality, all in one place.`}
+                  className='my-8'
+                >
+                  <Link
+                    to='/movies'
+                    className='inline-flex h-12 items-center rounded-full bg-primary px-7 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90'
+                  >
+                    Start exploring
+                  </Link>
+                </EndlessCorridor>
+              ),
+            }}
+          />
         </div>
       </div>
     </>

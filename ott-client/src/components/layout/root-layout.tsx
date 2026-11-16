@@ -8,7 +8,13 @@ export function RootLayout() {
     <>
       <AuthBootstrap />
       <NavigationProgress />
-      <ScrollRestoration />
+      {/* The first entry of every full page load has key 'default', so keying by it alone would restore
+          the last page's offset on a new URL typed into the same tab. Key that entry by path instead. */}
+      <ScrollRestoration
+        getKey={(location) =>
+          location.key === 'default' ? location.pathname : location.key
+        }
+      />
       <Outlet />
       <Toaster duration={5000} />
     </>

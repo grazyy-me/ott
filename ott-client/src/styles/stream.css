@@ -31,7 +31,12 @@ html[data-surface='stream'] {
   --stream-glow-1: oklch(0.74 0.16 45);
   --stream-glow-2: oklch(0.65 0.22 355);
   --stream-glow-3: oklch(0.6 0.2 295);
-  --stream-gradient: linear-gradient(100deg, var(--stream-glow-1), var(--stream-glow-2) 50%, var(--stream-glow-3));
+  --stream-gradient: linear-gradient(
+    100deg,
+    var(--stream-glow-1),
+    var(--stream-glow-2) 50%,
+    var(--stream-glow-3)
+  );
 
   /* glass panels */
   --glass-bg: oklch(0.2 0.015 275 / 55%);
@@ -41,8 +46,18 @@ html[data-surface='stream'] {
   --glass-shadow: 0 18px 50px -18px oklch(0 0 0 / 70%);
 
   /* image scrims, so text over backdrops stays readable */
-  --scrim-bottom: linear-gradient(to top, var(--background) 0%, oklch(0.13 0.012 275 / 75%) 30%, transparent 70%);
-  --scrim-left: linear-gradient(to right, oklch(0.13 0.012 275 / 92%) 0%, oklch(0.13 0.012 275 / 55%) 40%, transparent 75%);
+  --scrim-bottom: linear-gradient(
+    to top,
+    var(--background) 0%,
+    oklch(0.13 0.012 275 / 75%) 30%,
+    transparent 70%
+  );
+  --scrim-left: linear-gradient(
+    to right,
+    oklch(0.13 0.012 275 / 92%) 0%,
+    oklch(0.13 0.012 275 / 55%) 40%,
+    transparent 75%
+  );
 
   --grain-opacity: 0.06;
 
@@ -53,7 +68,8 @@ html[data-surface='stream'] {
   --color-glow-1: var(--stream-glow-1);
   --color-glow-2: var(--stream-glow-2);
   --color-glow-3: var(--stream-glow-3);
-  --font-display: 'Bricolage Grotesque', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    'Bricolage Grotesque', 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Display type scale: fluid, tight, for hero titles and section headings */
@@ -121,4 +137,30 @@ html[data-surface='stream'] {
 /* Lenis owns smooth scrolling; native smooth scrolling would fight it */
 html[data-surface='stream'].lenis {
   scroll-behavior: auto;
+}
+
+/* Loading placeholders: a soft sweep of light; still with reduced motion */
+@utility skeleton {
+  background-color: var(--muted);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in oklch, var(--foreground) 7%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-sweep 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+
+html[data-motion='reduce'] .skeleton {
+  animation: none;
 }

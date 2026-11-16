@@ -1,6 +1,12 @@
 import type { ApiResponse } from '@/types/api'
 import type {
+  BrowseFilters,
   Episode,
+  Facets,
+  Rail,
+  RailKey,
+  RailPage,
+  RailPageKey,
   Genre,
   Paginated,
   SearchParams,
@@ -69,6 +75,65 @@ export const catalogApi = baseApi.injectEndpoints({
     }),
   }),
 })
+
+/** Args for one rail's grid: the rail, the page type it's shown on, and the FilterBar's filters */
+export interface RailTitlesArg extends BrowseFilters {
+  key: RailKey
+  type?: TitleType
+}
+
+const GRID_PAGE_SIZE = 24
+
+export const railsApi = baseApi.injectEndpoints({
+  endpoints: (build) => ({
+    /**
+     * Every rail of a page in one request. `signedIn` is part of the cache key, so signing in or out
+     * refetches (personal rails appear or disappear); the token itself is added by baseApi.
+     */
+    getRails: build.query<
+      ApiResponse<{ page: RailPageKey; rails: Rail[] }>,
+      { page: RailPageKey; signedIn: boolean }
+    >({
+      query: ({ page }) => ({ url: '/rails', params: { page } }),
+      keepUnusedDataFor: KEEP_FOR_SECONDS,
+    }),
+
+    /** "Show all" and filtered browse: one rail's titles, page after page (infinite scroll) */
+    getRailTitles: build.infiniteQuery<
+      ApiResponse<RailPage>,
+      RailTitlesArg,
+      number
+    >({
+      infiniteQueryOptions: {
+        initialPageParam: 1,
+        getNextPageParam: (last) =>
+          last.data.page < last.data.totalPages
+            ? last.data.page + 1
+            : undefined,
+      },
+      query: ({ queryArg: { key, ...params }, pageParam }) => ({
+        url: `/rails/${key}/titles`,
+        params: { ...params, page: pageParam, limit: GRID_PAGE_SIZE },
+      }),
+      keepUnusedDataFor: KEEP_FOR_SECONDS,
+    }),
+
+    /** Countries, languages and year range present, for the FilterBar */
+    getFacets: build.query<ApiResponse<Facets>, TitleType | void>({
+      query: (type) => ({
+        url: '/titles/facets',
+        params: { type: type ?? undefined },
+      }),
+      keepUnusedDataFor: KEEP_FOR_SECONDS,
+    }),
+  }),
+})
+
+export const {
+  useGetRailsQuery,
+  useGetRailTitlesInfiniteQuery,
+  useGetFacetsQuery,
+} = railsApi
 
 export const {
   useGetTitlesQuery,

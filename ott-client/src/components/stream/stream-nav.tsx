@@ -79,12 +79,14 @@ function NavLinks({
       const link = highlighted
         ? list.querySelector<HTMLElement>(`[data-to="${highlighted}"]`)
         : null
+      // each link's offset parent is its own `li.relative`, so add the li's offset within the list
+      const item = link?.parentElement
       setPill(
-        link
+        link && item
           ? {
-              left: link.offsetLeft,
+              left: item.offsetLeft + link.offsetLeft,
               width: link.offsetWidth,
-              top: link.offsetTop,
+              top: item.offsetTop + link.offsetTop,
               height: link.offsetHeight,
             }
           : null

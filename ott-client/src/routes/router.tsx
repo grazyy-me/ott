@@ -140,6 +140,22 @@ export const router = createBrowserRouter([
               Component: (await import('@/features/home')).Home,
             }),
           },
+          // browse: rails per type, filtered infinite grids, and each rail's "Show all"
+          ...(['movie', 'series', 'reality'] as const).map((type) => ({
+            path: type === 'movie' ? '/movies' : `/${type}`,
+            lazy: async () => {
+              const { BrowsePage } =
+                await import('@/features/browse/browse-page')
+              return { Component: () => <BrowsePage type={type} /> }
+            },
+          })),
+          {
+            path: '/browse/:key',
+            lazy: async () => ({
+              Component: (await import('@/features/browse/show-all-page'))
+                .ShowAllPage,
+            }),
+          },
           {
             path: '/lab',
             // start the catalog request now, in parallel with downloading the page's code

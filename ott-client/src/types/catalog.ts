@@ -151,3 +151,78 @@ export interface SearchParams {
   page?: number
   limit?: number
 }
+
+// ---------------------------------------------------------------- rails (GET /rails, GET /rails/:key/titles)
+
+export type RailPageKey = 'home' | 'movie' | 'series' | 'reality'
+
+export type RailKey =
+  | 'continue-watching'
+  | 'trending'
+  | 'latest'
+  | 'most-watched'
+  | 'because-you-watched'
+  | 'top-rated'
+  | 'award-winners'
+  | 'free'
+  | 'binge-worthy'
+  | 'documentaries'
+  | 'coming-soon'
+  | 'competition'
+  | 'dating'
+  | 'docu-reality'
+  | 'all'
+
+/** Continue Watching only: where the viewer stopped */
+export interface WatchProgressInfo {
+  positionSec: number
+  durationSec: number
+  /** 0 to 100 */
+  percent: number
+  updatedAt: string
+  episode: {
+    id: string
+    seasonNumber: number
+    episodeNumber: number
+    name: string
+  } | null
+}
+
+export interface RailItem extends TitleCard {
+  progress?: WatchProgressInfo
+  /** award labels, e.g. "Oscar · Best Picture (2020)" */
+  awards?: string[]
+}
+
+export interface Rail {
+  key: RailKey
+  /** e.g. "Because You Watched Breaking Bad" */
+  title: string
+  /** Because You Watched only: the title it is based on */
+  source: { id: string; title: string; slug: string } | null
+  items: RailItem[]
+  /** how many titles "Show all" has */
+  total: number
+}
+
+export interface RailPage extends Paginated<RailItem> {
+  key: RailKey
+  title: string
+  source?: Rail['source']
+}
+
+/** The FilterBar's filters, mirrored in the URL query */
+export interface BrowseFilters {
+  country?: string
+  language?: string
+  genre?: string
+  year?: number
+  /** Latest, Most Watched, Top Rated */
+  sort?: 'latest' | 'popular' | 'rating'
+}
+
+export interface Facets {
+  countries: { code: string; count: number }[]
+  languages: { code: string; count: number }[]
+  years: { min: number; max: number } | null
+}
