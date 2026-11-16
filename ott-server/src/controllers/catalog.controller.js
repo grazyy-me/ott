@@ -9,7 +9,7 @@ export const listTitles = catchAsync(async (req, res) => {
 });
 
 export const getTitle = catchAsync(async (req, res) => {
-  const title = await catalogService.getTitleBySlug(req.params.slug);
+  const title = await catalogService.getTitleBySlug(req.params.slug, req.user);
   res.json(new ApiResponse(httpStatus.OK, { title }));
 });
 

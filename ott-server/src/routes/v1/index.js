@@ -4,6 +4,7 @@ import authRoute from './auth.route.js';
 import userRoute from './user.route.js';
 import catalogRoute from './catalog.route.js';
 import railRoute from './rail.route.js';
+import watchlistRoute from './watchlist.route.js';
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.get('/health', (req, res) => {
 
 router.use('/auth', authRoute);
 router.use('/users', userRoute);
+router.use('/me/watchlist', watchlistRoute);
 // rail routes first: '/titles/facets' must win over the catalog's '/titles/:slug'
 router.use('/', railRoute);
 router.use('/', catalogRoute);

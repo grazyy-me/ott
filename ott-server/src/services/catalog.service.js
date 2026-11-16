@@ -1,6 +1,6 @@
 import httpStatus from 'http-status';
 import ApiError from '../utils/ApiError.js';
-import { Title, Genre, Season, Episode } from '../models/index.js';
+import { Title, Genre, Season, Episode, Watchlist } from '../models/index.js';
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -146,8 +146,19 @@ export const getFacets = async ({ type }) => {
   };
 };
 
-/** GET /titles/:slug — everything the detail page needs, minus episodes (see getEpisodes) */
-export const getTitleBySlug = async (slug) => {
+/** Crew members with one of these jobs, each person once, in billing order */
+const crewFor = (crew, jobs) => {
+  const seen = new Set();
+  return crew
+    .filter((c) => jobs.includes(c.job) && c.person && !seen.has(c.person.id) && seen.add(c.person.id))
+    .map((c) => ({ ...c.person, job: c.job }));
+};
+
+/**
+ * GET /titles/:slug — everything the detail page needs, minus episodes (see getEpisodes).
+ * Signed in, `inList` says whether the title is on the user's My List.
+ */
+export const getTitleBySlug = async (slug, user) => {
   const title = await Title.findOne({ slug, isPublished: true })
     .populate('genres', 'name slug')
     .populate('cast.person', 'name profileUrl')
@@ -158,10 +169,17 @@ export const getTitleBySlug = async (slug) => {
 
   const json = title.toJSON();
   json.cast = [...json.cast].sort((a, b) => a.order - b.order);
-  const directors = json.crew.filter((c) => c.job === 'Director' || c.job === 'Creator');
+  const directors = crewFor(json.crew, ['Director']);
+  const creators = crewFor(json.crew, ['Creator']);
+  const inList = user ? Boolean(await Watchlist.exists({ user: user._id, title: title._id })) : false;
   return {
     ...json,
-    director: directors.map((d) => ({ ...d.person, job: d.job })),
+    // kept for older clients: directors, or creators for series
+    director: directors.length ? directors : creators,
+    directors,
+    creators,
+    writers: crewFor(json.crew, ['Screenplay', 'Writer', 'Story']),
+    inList,
     seasons: seasons.map((s) => s.toJSON()),
   };
 };

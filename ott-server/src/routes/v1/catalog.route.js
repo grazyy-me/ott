@@ -1,4 +1,5 @@
 import express from 'express';
+import optionalAuth from '../../middlewares/optionalAuth.js';
 import validateZod from '../../middlewares/validateZod.js';
 import * as catalogValidation from '../../validations/catalog.validation.js';
 import * as catalogController from '../../controllers/catalog.controller.js';
@@ -14,7 +15,8 @@ router.get(
   validateZod(catalogValidation.getEpisodes),
   catalogController.getEpisodes
 );
-router.get('/titles/:slug', validateZod(catalogValidation.getTitle), catalogController.getTitle);
+// signed in, the detail also says whether the title is on My List
+router.get('/titles/:slug', optionalAuth(), validateZod(catalogValidation.getTitle), catalogController.getTitle);
 
 router.get('/genres', validateZod(catalogValidation.listGenres), catalogController.listGenres);
 router.get('/search', validateZod(catalogValidation.search), catalogController.search);

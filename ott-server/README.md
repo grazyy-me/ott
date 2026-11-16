@@ -41,7 +41,7 @@ All routes are under `/v1`. Success responses are `{ statusCode, data, message, 
 | GET / POST | `/users` | admin | List (paginated) / create |
 | GET / PATCH / DELETE | `/users/:userId` | admin | |
 | GET | `/titles` | | Query: `type` (movie\|series\|reality), `genre` (slug), `country` (ISO 3166-1), `language` (ISO 639-1), `year`, `sort` (latest\|popular\|rating\|trending), `release` (released\|upcoming), `free`, `page`, `limit` (max 50). Returns `{ results, page, limit, totalPages, totalResults }` |
-| GET | `/titles/:slug` | | Full details: genres, cast (ordered), crew, `director`, seasons. Never includes `videoUrl` |
+| GET | `/titles/:slug` | optional Bearer | Full details: genres, cast (ordered), crew grouped as `directors`, `creators` and `writers` (plus the older `director`), seasons, awards, and `inList` (false signed out). Never includes `videoUrl` |
 | GET | `/titles/:id/similar` | | Same type, ranked by shared genres. `?limit=` (max 24, default 12) |
 | GET | `/titles/:id/seasons/:seasonNumber/episodes` | | Season and its episodes |
 | GET | `/genres` | | Genres with title counts; `?type=` counts within one type |
@@ -52,6 +52,10 @@ All routes are under `/v1`. Success responses are `{ statusCode, data, message, 
 | GET | `/me/continue-watching` | Bearer | In-progress titles (not finished, newest first), each with `progress { positionSec, durationSec, percent, updatedAt, episode }`. `?type=`, `page`, `limit` |
 | PUT | `/me/progress` | Bearer | `{ titleId, episodeId?, positionSec, durationSec }`. Past 92% the item counts as finished and leaves Continue Watching |
 | DELETE | `/me/progress/:titleId` | Bearer | Removes a title from Continue Watching |
+| GET | `/me/watchlist` | Bearer | My List as title cards, newest first, each with `addedAt`. `page`, `limit` (max 48) |
+| GET | `/me/watchlist/ids` | Bearer | `{ ids }`: every title id on My List, so cards can show "added" without a request each |
+| PUT | `/me/watchlist/:titleId` | Bearer | Adds a title (204; adding twice is fine). 404 for an unknown or unpublished title |
+| DELETE | `/me/watchlist/:titleId` | Bearer | Removes a title (204, also when it wasn't there) |
 
 Catalog routes validate with zod (`middlewares/validateZod.js`); bad input returns 400 with the failing fields.
 
