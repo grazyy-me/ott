@@ -26,11 +26,15 @@ const envVarsSchema = Joi.object()
     CLOUDINARY_API_KEY: Joi.string().allow(''),
     CLOUDINARY_API_SECRET: Joi.string().allow(''),
     // ---- OTT additions ----
-    TMDB_READ_TOKEN: Joi.string().allow('').description('TMDB API Read Access Token (v4 bearer); server-side only'),
+    TMDB_API_KEY: Joi.string().allow('').description('TMDB v3 API key; server-side only'),
+    TMDB_READ_TOKEN: Joi.string().allow('').description('TMDB v4 read access token (used instead of the key if set)'),
     RAZORPAY_KEY_ID: Joi.string().allow(''),
     RAZORPAY_KEY_SECRET: Joi.string().allow(''),
     RAZORPAY_WEBHOOK_SECRET: Joi.string().allow(''),
-    PLAYBACK_URL_TTL_SECONDS: Joi.number().integer().min(60).default(4 * 60 * 60),
+    PLAYBACK_URL_TTL_SECONDS: Joi.number()
+      .integer()
+      .min(60)
+      .default(4 * 60 * 60),
   })
   .unknown();
 
@@ -87,6 +91,7 @@ const config = {
     apiSecret: envVars.CLOUDINARY_API_SECRET,
   },
   tmdb: {
+    apiKey: envVars.TMDB_API_KEY,
     readToken: envVars.TMDB_READ_TOKEN,
   },
   razorpay: {

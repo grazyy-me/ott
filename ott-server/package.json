@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "lint": "eslint src",
+    "seed:tmdb": "node scripts/importTmdb.js",
+    "lint": "eslint src scripts",
     "format": "prettier --write \"src/**/*.js\""
   },
   "license": "MIT",
@@ -39,7 +40,8 @@
     "razorpay": "^2.9.8",
     "resend": "^6.37.0",
     "validator": "^13.15.35",
-    "winston": "^3.19.0"
+    "winston": "^3.19.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

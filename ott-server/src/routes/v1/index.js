@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import authRoute from './auth.route.js';
 import userRoute from './user.route.js';
+import catalogRoute from './catalog.route.js';
 
 const router = express.Router();
 
@@ -13,5 +14,6 @@ router.get('/health', (req, res) => {
 
 router.use('/auth', authRoute);
 router.use('/users', userRoute);
+router.use('/', catalogRoute);
 
 export default router;

@@ -40,6 +40,8 @@ services:
         sync: false
       - key: APP_NAME
         value: Streamly
+      - key: TMDB_API_KEY
+        sync: false
       - key: TMDB_READ_TOKEN
         sync: false
       - key: RAZORPAY_KEY_ID

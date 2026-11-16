@@ -1,2 +1,10 @@
 export { default as User } from './user.model.js';
 export { default as Token } from './token.model.js';
+export { default as Title, TITLE_TYPES } from './title.model.js';
+export { default as Genre } from './genre.model.js';
+export { default as Person } from './person.model.js';
+export { default as Season } from './season.model.js';
+export { default as Episode } from './episode.model.js';
+export { default as WatchProgress } from './watchProgress.model.js';
+export { default as Watchlist } from './watchlist.model.js';
+export { default as ViewEvent } from './viewEvent.model.js';

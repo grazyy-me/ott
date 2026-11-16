@@ -40,6 +40,29 @@ All routes are under `/v1`. Success responses are `{ statusCode, data, message, 
 | PATCH | `/users/me/avatar` | Bearer | `multipart/form-data`, field `avatar` |
 | GET / POST | `/users` | admin | List (paginated) / create |
 | GET / PATCH / DELETE | `/users/:userId` | admin | |
+| GET | `/titles` | | Query: `type` (movie\|series\|reality), `genre` (slug), `country` (ISO 3166-1), `language` (ISO 639-1), `year`, `sort` (latest\|popular\|rating), `free`, `page`, `limit` (max 50). Returns `{ results, page, limit, totalPages, totalResults }` |
+| GET | `/titles/:slug` | | Full details: genres, cast (ordered), crew, `director`, seasons. Never includes `videoUrl` |
+| GET | `/titles/:id/similar` | | Same type, ranked by shared genres. `?limit=` (max 24, default 12) |
+| GET | `/titles/:id/seasons/:seasonNumber/episodes` | | Season and its episodes |
+| GET | `/genres` | | Genres with title counts; `?type=` counts within one type |
+| GET | `/search?q=` | | Substring match on title; `q` needs 2+ characters. Also `type`, `page`, `limit` |
+
+Catalog routes validate with zod (`middlewares/validateZod.js`); bad input returns 400 with the failing fields.
+
+## Seeding the catalog from TMDB
+
+Set `TMDB_API_KEY` (v3 key) or `TMDB_READ_TOKEN` (v4 token) in `.env`, then:
+
+```bash
+npm run seed:tmdb                                           # ~300 movies, ~150 series, ~50 reality shows, 15 free
+npm run seed:tmdb -- --movies=20 --series=10 --reality=5 --free=3   # a small test run
+```
+
+- Safe to re-run: everything is upserted by TMDB id and type. `slug`, `isFree`, `videoUrl`, `isPublished` and `viewCount` are never overwritten, so admin edits survive a re-sync.
+- Reality shows are TMDB TV titles in genre 10764. Talk shows, news and soaps are left out of "series".
+- Requests are spaced to stay under TMDB's limit, and a 429 pauses all workers for the `Retry-After` time.
+- Series and reality shows import seasons 1 to 10 (`--max-seasons`) with their episodes; "Specials" are skipped.
+- The free titles (8 movies, 4 series, 3 reality shows, best-rated first) get an open-licence demo HLS stream as `videoUrl`, and so do all their episodes. Replace them with real video later.
 
 To make someone an admin, set `role: "admin"` on their user document in MongoDB.
 
