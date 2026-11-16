@@ -54,7 +54,14 @@ All routes are under `/v1`. Success responses are `{ statusCode, data, message, 
 | PUT | `/me/progress` | Bearer | `{ titleId, episodeId?, positionSec, durationSec }`. Past 95% the item counts as finished. Saving brings a removed title back |
 | DELETE | `/me/progress/:titleId` | Bearer | Removes a title from Continue Watching (hidden; its history and resume points stay) |
 | POST | `/me/progress/:titleId/restore` | Bearer | Undo for the removal, without changing the row order |
-| POST | `/playback/:titleId` | Bearer | `{ episodeId? }` → `{ src, expiresAt, resumeAt, title, episode, next }`. For a series without `episodeId`: the episode in progress, else the one after the last finished, else S1E1. `resumeAt` is 0 under 30 s or past 95%. 403 when the title has no video yet; until billing exists any signed-in user may play |
+| POST | `/playback/:titleId` | optional Bearer | `{ episodeId? }` → `{ resumeAt, isFree, title, episode, next }`, never the video URL. For a series without `episodeId`: the episode in progress, else the one after the last finished, else S1E1 (guests: S1E1). `resumeAt` is 0 for guests, under 30 s or past 95%. 403 when the title has no video yet |
+| GET | `/titles/:id/stream` | optional Bearer | `?episodeId=` → `{ src, expiresAt }`: the only response that ever carries a video URL. Free titles: anyone, guests included. Everything else needs an active subscription, otherwise **402** `{ code: 'SUBSCRIPTION_REQUIRED', requires: 'account' \| 'subscription', message, plans }` |
+| GET | `/billing/plans` | | `{ plans: [{ code, name, interval, amountPaise, currency, features, available }], yearlySavingPercent }` |
+| POST | `/billing/subscribe` | Bearer | `{ plan: 'monthly' \| 'yearly' }` → `{ subscriptionId, keyId, plan, prefill, appName }` for Razorpay Checkout. 409 if already subscribed; a recent unpaid one is reused. 503 until plans are synced |
+| POST | `/billing/verify` | Bearer | `{ paymentId, subscriptionId, signature }` from Checkout. Checks the signature, then stores Razorpay's state for the subscription (access unlocks at once) |
+| GET | `/billing/me` | Bearer | `{ entitled, subscription: { plan, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd, … }, payments }` |
+| POST | `/billing/cancel` | Bearer | Cancels at the end of the period already paid for; access continues until then |
+| POST | `/billing/webhook` | Razorpay signature | Raw body, `x-razorpay-signature` (HMAC-SHA256 with `RAZORPAY_WEBHOOK_SECRET`). Idempotent by `x-razorpay-event-id`; late, older events don't change status. Handles subscription `authenticated`, `activated`, `charged`, `pending`, `halted`, `cancelled`, `completed`, `updated` |
 | POST | `/playback/:titleId/view` | Bearer | `{ episodeId? }`. Logs one view per viewing session (repeats within 30 minutes are ignored) and adds 1 to `viewCount`. Feeds Most Watched and Trending |
 | GET | `/me/watchlist` | Bearer | My List as title cards, newest first, each with `addedAt`. `page`, `limit` (max 48) |
 | GET | `/me/watchlist/ids` | Bearer | `{ ids }`: every title id on My List, so cards can show "added" without a request each |
@@ -116,6 +123,54 @@ To make someone an admin, set `role: "admin"` on their user document in MongoDB.
 **GitHub OAuth:** Settings > Developer settings > OAuth Apps. Callback URL: `{SERVER_URL}/v1/auth/github/callback`.
 
 **Cloudinary:** copy the cloud name, API key and secret from the dashboard.
+
+**Razorpay:** see "Testing subscriptions" below. In production, use live keys only after KYC and account activation.
+
+## Testing subscriptions (Razorpay test mode)
+
+Access rule: a user can watch Premium titles while their subscription is `authenticated`, `active` or `pending`
+(a renewal being retried), or `cancelled` with `currentPeriodEnd` still in the future. `halted` (renewals
+failed), `completed` and `expired` lock Premium. Free titles play for everyone, guests included.
+
+1. **Keys.** In the Razorpay dashboard switch to **Test mode**, then Account & Settings → API Keys → generate a
+   key. Put it in `.env` (never commit it):
+   ```
+   RAZORPAY_KEY_ID=rzp_test_...
+   RAZORPAY_KEY_SECRET=...
+   RAZORPAY_WEBHOOK_SECRET=a-long-random-string-you-choose
+   ```
+2. **Plans.** Create the two plans in your Razorpay test account (prices come from `src/config/plans.js`):
+   ```bash
+   npm run billing:sync-plans
+   ```
+   Running it again is safe. Changing a price creates a new Razorpay plan (existing subscribers stay on theirs).
+3. **Webhook.** Razorpay must reach your machine:
+   ```bash
+   cloudflared tunnel --url http://localhost:5000      # or: ngrok http 5000
+   ```
+   In the dashboard (Test mode) → Webhooks → Add: URL `https://<tunnel-host>/v1/billing/webhook`, secret = your
+   `RAZORPAY_WEBHOOK_SECRET`, events: subscription.authenticated, .activated, .charged, .pending, .halted,
+   .cancelled, .completed, .updated.
+4. **Subscribe.** Open `/pricing` (or play a Premium title to get the paywall), sign in, choose a plan and pay
+   with a [Razorpay test card](https://razorpay.com/docs/payments/payments/test-card-details/) or the test UPI id
+   `success@razorpay` (`failure@razorpay` to see a failure). Premium titles play straight after payment; the
+   webhook then confirms it.
+5. **Check:** `/account` shows the plan and renewal date; **Cancel** keeps access until the period end; replaying a
+   webhook (Razorpay dashboard → Webhooks → resend) changes nothing.
+
+**Without a tunnel:** send signed sample events to your local server yourself:
+
+```bash
+# give a local test account a subscription (no payment), then charge, cancel or halt it
+npm run billing:replay-webhook -- --event=subscription.activated --subscription=sub_localtest1 --user=<user id>
+npm run billing:replay-webhook -- --event=subscription.charged --subscription=sub_localtest1 --event-id=evt_1
+npm run billing:replay-webhook -- --event=subscription.charged --subscription=sub_localtest1 --event-id=evt_1   # duplicate: ignored
+npm run billing:replay-webhook -- --event=subscription.halted --subscription=sub_localtest1                    # Premium locked
+```
+
+Payments and security notes: prices live only on the server (the browser sends a plan code); the key secret and
+webhook secret never leave the server; Checkout's success callback is only trusted after its signature is checked;
+webhooks are verified over the raw body with a constant-time comparison before anything is parsed.
 
 ## Deploying to Render
 

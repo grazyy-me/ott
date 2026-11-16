@@ -55,3 +55,42 @@ export const sendVerificationEmail = async (to, token) => {
     }),
   });
 };
+
+// ---------------------------------------------------------------- billing
+
+const formatDate = (date) =>
+  date ? new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+
+export const sendSubscriptionStartedEmail = async (user, planName) => {
+  const { html, text } = renderEmail({
+    heading: `Welcome to ${config.appName}`,
+    body: `Hi ${user.name}, your ${planName} subscription is active. Every title is ready to watch.`,
+    buttonLabel: 'Start watching',
+    url: `${config.clientUrl}/`,
+    footer: 'Manage your plan any time from your account page.',
+  });
+  await sendEmail({ to: user.email, subject: `Your ${config.appName} subscription is active`, text, html });
+};
+
+export const sendSubscriptionCancelledEmail = async (user, planName, accessUntil) => {
+  const until = formatDate(accessUntil);
+  const { html, text } = renderEmail({
+    heading: 'Your subscription is cancelled',
+    body: `Hi ${user.name}, your ${planName} subscription has been cancelled.${until ? ` You can keep watching until ${until}.` : ''}`,
+    buttonLabel: 'See plans',
+    url: `${config.clientUrl}/pricing`,
+    footer: 'You can subscribe again whenever you like.',
+  });
+  await sendEmail({ to: user.email, subject: `Your ${config.appName} subscription is cancelled`, text, html });
+};
+
+export const sendPaymentFailedEmail = async (user, planName) => {
+  const { html, text } = renderEmail({
+    heading: 'We couldn’t renew your subscription',
+    body: `Hi ${user.name}, the payment for your ${planName} subscription failed after several attempts, so access is paused. Update your payment method to continue.`,
+    buttonLabel: 'Go to your account',
+    url: `${config.clientUrl}/account`,
+    footer: 'If you think this is a mistake, check with your bank or card provider.',
+  });
+  await sendEmail({ to: user.email, subject: `Payment failed for your ${config.appName} subscription`, text, html });
+};

@@ -6,6 +6,7 @@ import catalogRoute from './catalog.route.js';
 import railRoute from './rail.route.js';
 import watchlistRoute from './watchlist.route.js';
 import playbackRoute from './playback.route.js';
+import billingRoute from './billing.route.js';
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ router.use('/auth', authRoute);
 router.use('/users', userRoute);
 router.use('/me/watchlist', watchlistRoute);
 router.use('/playback', playbackRoute);
+router.use('/billing', billingRoute);
 // rail routes first: '/titles/facets' must win over the catalog's '/titles/:slug'
 router.use('/', railRoute);
 router.use('/', catalogRoute);

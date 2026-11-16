@@ -10,3 +10,8 @@ const playbackRequest = {
 
 export const startPlayback = playbackRequest;
 export const logView = playbackRequest;
+
+export const stream = {
+  params: z.object({ id: objectId }),
+  query: z.object({ episodeId: objectId.optional() }),
+};

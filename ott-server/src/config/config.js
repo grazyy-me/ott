@@ -31,6 +31,8 @@ const envVarsSchema = Joi.object()
     RAZORPAY_KEY_ID: Joi.string().allow(''),
     RAZORPAY_KEY_SECRET: Joi.string().allow(''),
     RAZORPAY_WEBHOOK_SECRET: Joi.string().allow(''),
+    // tests point this at a fake Razorpay server; never set it in production
+    RAZORPAY_API_URL: Joi.string().uri().default('https://api.razorpay.com/v1'),
     PLAYBACK_URL_TTL_SECONDS: Joi.number()
       .integer()
       .min(60)
@@ -98,6 +100,7 @@ const config = {
     keyId: envVars.RAZORPAY_KEY_ID,
     keySecret: envVars.RAZORPAY_KEY_SECRET,
     webhookSecret: envVars.RAZORPAY_WEBHOOK_SECRET,
+    apiUrl: envVars.RAZORPAY_API_URL.replace(/\/$/, ''),
   },
   playback: {
     urlTtlSeconds: envVars.PLAYBACK_URL_TTL_SECONDS,

@@ -40,10 +40,9 @@ const episodeToPlay = async (user, title) => {
 };
 
 /**
- * POST /playback/:titleId: where to stream from and where to start.
- * Until billing exists, every signed-in user may play anything that has video (agreed for this phase);
- * the subscription check slots in here later and answers 402.
- * The demo streams are public URLs; with Cloudinary this returns a short-lived signed URL instead.
+ * POST /playback/:titleId: what to play and where to start (episode, resume point, next episode). It never
+ * returns the video URL: that comes only from GET /titles/:id/stream, behind requireSubscription.
+ * Guests (no user) get the first episode and no resume point; they can only stream free titles.
  */
 export const startPlayback = async (user, titleId, { episodeId } = {}) => {
   const title = await Title.findOne({ _id: titleId, isPublished: true });
@@ -53,23 +52,26 @@ export const startPlayback = async (user, titleId, { episodeId } = {}) => {
   if (title.type !== 'movie') {
     episode = episodeId
       ? await Episode.findOne({ _id: episodeId, title: title._id })
-      : await episodeToPlay(user, title);
+      : user
+        ? await episodeToPlay(user, title)
+        : await Episode.findOne({ title: title._id }).sort({ seasonNumber: 1, episodeNumber: 1 });
     if (!episode) throw new ApiError(httpStatus.NOT_FOUND, 'Episode not found');
   }
 
-  const src = episode ? episode.videoUrl : title.videoUrl;
-  if (!src) throw new ApiError(httpStatus.FORBIDDEN, 'This title isn’t available to stream yet');
+  const hasVideo = Boolean(episode ? episode.videoUrl : title.videoUrl);
+  if (!hasVideo) throw new ApiError(httpStatus.FORBIDDEN, 'This title isn’t available to stream yet');
 
-  const progress = await WatchProgress.findOne({ user: user.id, title: title._id, episode: episode?._id ?? null });
+  const progress = user
+    ? await WatchProgress.findOne({ user: user.id, title: title._id, episode: episode?._id ?? null })
+    : null;
   const nearEnd = progress?.durationSec && progress.positionSec / progress.durationSec >= COMPLETE_AT;
   const resumeAt =
     progress && !progress.completed && !nearEnd && progress.positionSec >= MIN_RESUME_SEC ? progress.positionSec : 0;
   const next = episode ? await nextEpisodeOf(title._id, episode) : null;
 
   return {
-    src,
-    expiresAt: new Date(Date.now() + config.playback.urlTtlSeconds * 1000),
     resumeAt,
+    isFree: title.isFree,
     title: {
       id: title.id,
       slug: title.slug,
@@ -82,6 +84,17 @@ export const startPlayback = async (user, titleId, { episodeId } = {}) => {
     episode: episodeCard(episode),
     next: episodeCard(next),
   };
+};
+
+/**
+ * GET /titles/:id/stream (after requireSubscription, which loaded the title and episode): the only place the
+ * video URL is ever returned. The demo streams are public URLs; with Cloudinary this becomes a short-lived
+ * signed URL.
+ */
+export const streamFor = ({ title, episode }) => {
+  const src = episode ? episode.videoUrl : title.videoUrl;
+  if (!src) throw new ApiError(httpStatus.FORBIDDEN, 'This title isn’t available to stream yet');
+  return { src, expiresAt: new Date(Date.now() + config.playback.urlTtlSeconds * 1000) };
 };
 
 /**

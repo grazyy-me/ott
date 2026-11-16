@@ -8,3 +8,7 @@ export { default as Episode } from './episode.model.js';
 export { default as WatchProgress } from './watchProgress.model.js';
 export { default as Watchlist } from './watchlist.model.js';
 export { default as ViewEvent } from './viewEvent.model.js';
+export { default as Plan } from './plan.model.js';
+export { default as Subscription } from './subscription.model.js';
+export { default as Payment } from './payment.model.js';
+export { default as PaymentEvent } from './paymentEvent.model.js';
