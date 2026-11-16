@@ -1,0 +1,92 @@
+# ott-server
+
+Streamly OTT API (Express + MongoDB), built on the MERN starter kit. Pairs with **ott-client**. Project decisions live in `../CLAUDE.md`.
+
+- Email/password auth with JWT: short-lived access token in the response, refresh token in an **httpOnly cookie**, rotated on every refresh and stored hashed
+- **Google and GitHub sign-in** (Passport, no sessions), linked to existing accounts by email
+- Email verification and password reset, sent with **Resend** (printed to the console when no API key is set)
+- Avatar uploads to **Cloudinary** (Multer, 2 MB image limit)
+- Roles (`user`, `admin`) with admin user-management routes
+- Joi validation, Helmet, CORS with credentials, Mongo sanitizing, rate limiting on auth routes in production, Winston logging
+
+## Quick start
+
+```bash
+cp .env.example .env     # fill in MONGODB_URL and JWT_SECRET at minimum
+npm install
+npm run dev              # http://localhost:5000/v1/health
+```
+
+Node 20+ is required. Everything except `MONGODB_URL`, `CLIENT_URL` and `JWT_SECRET` is optional: features without config are switched off with a warning at startup.
+
+## API
+
+All routes are under `/v1`. Success responses are `{ statusCode, data, message, success: true }`; errors are `{ statusCode, message, success: false }`.
+
+| Method | Route | Auth | Notes |
+| --- | --- | --- | --- |
+| GET | `/health` | | Database status, for Render health checks |
+| POST | `/auth/register` | | `{ name, email, password }`; sends the verification email |
+| POST | `/auth/login` | | `{ email, password }` |
+| POST | `/auth/refresh-tokens` | cookie | Returns `{ user, accessToken }` and a new refresh cookie |
+| POST | `/auth/logout` | cookie | Deletes the refresh token and clears the cookie |
+| POST | `/auth/forgot-password` | | `{ email }`; same response whether or not the account exists |
+| POST | `/auth/reset-password?token=` | | `{ password }`; signs out every session |
+| POST | `/auth/verify-email?token=` | | |
+| POST | `/auth/send-verification-email` | Bearer | |
+| GET | `/auth/google`, `/auth/github` | | Browser redirect to the provider |
+| GET | `/auth/providers` | | Which OAuth providers are configured |
+| GET / PATCH | `/users/me` | Bearer | PATCH `{ name?, password? }` |
+| PATCH | `/users/me/avatar` | Bearer | `multipart/form-data`, field `avatar` |
+| GET / POST | `/users` | admin | List (paginated) / create |
+| GET / PATCH / DELETE | `/users/:userId` | admin | |
+
+To make someone an admin, set `role: "admin"` on their user document in MongoDB.
+
+## Setting up the services
+
+**MongoDB Atlas:** create a free cluster and a database user, copy the connection string into `MONGODB_URL`. Under Network Access allow `0.0.0.0/0`, because Render's free tier has no fixed IP.
+
+**Resend:** create an API key. Until you verify a domain, Resend only delivers to your own account's email address from `onboarding@resend.dev`. Verify a domain before real users sign up, then set `EMAIL_FROM` to an address on it.
+
+**Google OAuth:** in Google Cloud Console create an OAuth client (Web application). Authorised redirect URI: `{SERVER_URL}/v1/auth/google/callback`.
+
+**GitHub OAuth:** Settings > Developer settings > OAuth Apps. Callback URL: `{SERVER_URL}/v1/auth/github/callback`.
+
+**Cloudinary:** copy the cloud name, API key and secret from the dashboard.
+
+## Deploying to Render
+
+1. Push this repo to GitHub.
+2. In Render choose **New > Blueprint** and pick the repo; `render.yaml` creates the service.
+3. Fill in the secret values. `CLIENT_URL` is your Vercel URL, `SERVER_URL` is the Render URL.
+4. Update the Google and GitHub callback URLs to use the Render URL.
+
+The free tier sleeps after about 15 idle minutes, so the first request afterwards takes 30+ seconds. The client shows a "starting the server" message during that wait.
+
+## Cross-domain cookies
+
+With the client on `*.vercel.app` and the API on `*.onrender.com`, the refresh cookie is a third-party cookie. In production it is sent with `SameSite=None; Secure`, which works in Chrome today, but Safari and Firefox's strict mode block third-party cookies, so users there are signed out on reload.
+
+The fix is a custom domain for both, e.g. `app.example.com` (Vercel) and `api.example.com` (Render). The cookie is then same-site and works everywhere. No code changes are needed: update `CLIENT_URL`, `SERVER_URL`, the client's `VITE_API_URL` and the OAuth callback URLs.
+
+## Project structure
+
+```
+src/
+├── config/        env validation, logger, passport strategies, roles
+├── controllers/   request handlers
+├── middlewares/   auth, validation, errors, rate limit, uploads
+├── models/        User, Token (+ toJSON and paginate plugins)
+├── routes/v1/     route definitions
+├── services/      business logic: auth, tokens, users, email, OAuth
+├── templates/     email HTML
+├── utils/         ApiError, ApiResponse, cookies, Cloudinary
+├── validations/   Joi schemas
+├── app.js
+└── index.js
+```
+
+## Credits
+
+Built on [hagopj13/node-express-boilerplate](https://github.com/hagopj13/node-express-boilerplate) (MIT) and [hiteshchoudhary/chai-backend](https://github.com/hiteshchoudhary/chai-backend) (ISC). See `THIRD_PARTY_NOTICES.md`.
