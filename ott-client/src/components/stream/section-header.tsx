@@ -30,7 +30,7 @@ export function SectionHeader({
   return (
     <div
       className={cn(
-        'shell flex flex-col gap-6',
+        'flex shell flex-col gap-6',
         centered
           ? 'items-center text-center'
           : 'md:flex-row md:items-end md:justify-between',

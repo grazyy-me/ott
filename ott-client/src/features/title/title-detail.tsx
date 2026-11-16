@@ -6,7 +6,7 @@ import {
   type RefObject,
 } from 'react'
 import type { Credit, TitleCard, TitleDetail as Detail } from '@/types/catalog'
-import { Clapperboard, X } from 'lucide-react'
+import { Clapperboard, Volume2, VolumeX, X } from 'lucide-react'
 import { countryName, languageName } from '@/lib/locale-names'
 import { formatRuntime, lengthLabel, ratingLabel } from '@/lib/title-format'
 import { tmdbImage } from '@/lib/tmdb-image'
@@ -31,6 +31,12 @@ const loglineOf = (t: Pick<TitleCard, 'tagline' | 'overview'>) => {
     ? first
     : ''
 }
+
+const saveData = () =>
+  Boolean(
+    (navigator as Navigator & { connection?: { saveData?: boolean } })
+      .connection?.saveData
+  )
 
 const names = (people: Credit[]) => people.map((p) => p.name).join(', ')
 
@@ -60,6 +66,9 @@ export function TitleDetail({
   const t: TitleCard | undefined =
     detail ?? (seed?.slug === slug ? seed : undefined)
   const [trailerOpen, setTrailerOpen] = useState(false)
+  // the hero plays the trailer by itself (muted), like the hover preview; Trailer button only without it
+  const [heroTrailerVisible, setHeroTrailerVisible] = useState(false)
+  const [heroMuted, setHeroMuted] = useState(true)
   const [morphing, setMorphing] = useState(morph)
   const backdrop = useRef<HTMLDivElement>(null)
   const { reduced } = useMotion()
@@ -119,6 +128,7 @@ export function TitleDetail({
     )
   }
 
+  const heroTrailer = Boolean(t.trailerKey) && !reduced && !saveData()
   const logline = loglineOf(t)
   const meta = [
     t.year,
@@ -154,10 +164,39 @@ export function TitleDetail({
               alt=''
               fetchPriority='high'
               style={morphing ? { viewTransitionName: MORPH_NAME } : undefined}
-              className='size-full object-cover'
+              className={cn(
+                'size-full object-cover transition-opacity duration-700',
+                heroTrailerVisible && 'opacity-0'
+              )}
+            />
+          )}
+          {heroTrailer && (
+            <YouTubeTrailer
+              videoKey={t.trailerKey}
+              title={t.title}
+              muted={heroMuted}
+              onVisibleChange={setHeroTrailerVisible}
+              className='absolute inset-0'
             />
           )}
         </div>
+        {heroTrailerVisible && (
+          <button
+            type='button'
+            onClick={() => setHeroMuted((m) => !m)}
+            aria-label={heroMuted ? 'Unmute trailer' : 'Mute trailer'}
+            className={cn(
+              'absolute right-6 bottom-8 z-10 flex size-11 items-center justify-center rounded-full glass transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring md:right-10',
+              variant === 'page' && 'right-[clamp(1.25rem,4vw,4rem)] bottom-12'
+            )}
+          >
+            {heroMuted ? (
+              <VolumeX className='size-5' />
+            ) : (
+              <Volume2 className='size-5' />
+            )}
+          </button>
+        )}
         {trailerOpen && t.trailerKey && (
           <div className='absolute inset-0 z-10 bg-background'>
             <YouTubeTrailer
@@ -224,7 +263,7 @@ export function TitleDetail({
             <div className='mt-6 flex flex-wrap items-center gap-3'>
               <PlayButton title={t} />
               <MyListButton title={t} />
-              {t.trailerKey && !trailerOpen && (
+              {t.trailerKey && !heroTrailer && !trailerOpen && (
                 <button
                   type='button'
                   onClick={() => setTrailerOpen(true)}

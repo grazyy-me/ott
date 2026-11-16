@@ -318,7 +318,7 @@ function HoverPreview({
             videoKey={t.trailerKey}
             title={t.title}
             muted={muted}
-            onPlaying={() => setPlaying(true)}
+            onVisibleChange={setPlaying}
             onError={() => setVideoFailed(true)}
             className='absolute inset-0'
           />

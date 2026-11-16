@@ -95,7 +95,7 @@ function PinnedHero({ title }: { title?: TitleCard }) {
       <div aria-hidden='true' className='absolute inset-0 scrim-left' />
 
       <div
-        className='relative shell flex h-full min-h-svh flex-col justify-end pt-32 pb-[14svh]'
+        className='relative flex h-full min-h-svh shell flex-col justify-end pt-32 pb-[14svh]'
         style={
           reduced
             ? undefined
@@ -290,7 +290,7 @@ function StaggerSection({ titles }: { titles: TitleCard[] }) {
         key={posters.length}
         as='ul'
         // scroll-px matches the shell gutter, so snapping keeps the first poster off the screen edge
-        className='shell mt-8 no-scrollbar flex snap-x scroll-px-[clamp(1.25rem,4vw,3rem)] gap-4 overflow-x-auto pb-4'
+        className='mt-8 no-scrollbar flex shell snap-x scroll-px-[clamp(1.25rem,4vw,3rem)] gap-4 overflow-x-auto pb-4'
         step={60}
       >
         {(posters.length ? posters : Array.from({ length: 8 }, () => null)).map(
@@ -329,7 +329,7 @@ function ParallaxBand({ title }: { title?: TitleCard }) {
         <Backdrop title={title} />
       </Parallax>
       <div aria-hidden='true' className='absolute inset-0 scrim-bottom' />
-      <div className='relative shell flex h-full flex-col justify-end pb-16'>
+      <div className='relative flex h-full shell flex-col justify-end pb-16'>
         <Reveal>
           <Eyebrow>Parallax</Eyebrow>
           <p className='mt-4 max-w-[16ch] font-display text-display-2 font-bold'>

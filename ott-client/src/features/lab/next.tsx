@@ -4,7 +4,7 @@ import { Reveal } from '@/components/motion'
 /** Second lab page: navigating between /lab and here shows the RouteTransition cross-fade. */
 export function LabNext() {
   return (
-    <section className='shell flex min-h-svh flex-col justify-center pt-32 pb-20'>
+    <section className='flex min-h-svh shell flex-col justify-center pt-32 pb-20'>
       <Reveal>
         <p className='text-eyebrow font-semibold text-muted-foreground uppercase'>
           Route transition

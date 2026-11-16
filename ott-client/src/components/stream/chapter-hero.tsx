@@ -230,7 +230,7 @@ export function ChapterHero({
       {/* one screen of copy per chapter, scrolling over the sticky media */}
       <div className='absolute inset-0 z-20'>
         {chapters.map((chapter) => (
-          <div key={chapter.id} className='shell flex h-svh items-center'>
+          <div key={chapter.id} className='flex h-svh shell items-center'>
             <ChapterCopy chapter={chapter} />
           </div>
         ))}

@@ -24,7 +24,7 @@ export function RailHeader({
   href?: string
 }) {
   return (
-    <div className='shell flex items-end justify-between gap-6'>
+    <div className='flex shell items-end justify-between gap-6'>
       <Reveal y={20}>
         <h2 className='font-display text-display-3 font-semibold text-balance'>
           {title}

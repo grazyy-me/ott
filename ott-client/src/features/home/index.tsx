@@ -251,7 +251,7 @@ export function Home() {
                       description='Open a mood to see what is playing in it tonight.'
                     />
                   </div>
-                  <div className='relative shell mt-10'>
+                  <div className='relative mt-10 shell'>
                     <InteractiveSelector items={moods} label='Moods' />
                   </div>
                 </section>

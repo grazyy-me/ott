@@ -25,7 +25,7 @@ const COLUMNS = [
 export function StreamFooter() {
   return (
     <footer className='relative mt-24 border-t border-border'>
-      <div className='shell grid gap-12 py-16 md:grid-cols-[1.4fr_1fr_1fr]'>
+      <div className='grid shell gap-12 py-16 md:grid-cols-[1.4fr_1fr_1fr]'>
         <div>
           <Link to='/' className='inline-flex items-center gap-2.5'>
             <span

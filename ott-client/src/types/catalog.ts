@@ -170,6 +170,7 @@ export type RailKey =
   | 'latest'
   | 'most-watched'
   | 'because-you-watched'
+  | 'because-you-watched-2'
   | 'top-rated'
   | 'award-winners'
   | 'free'
@@ -194,6 +195,8 @@ export interface WatchProgressInfo {
     episodeNumber: number
     name: string
   } | null
+  /** A finished episode's series, pointing at the next episode (0%) */
+  upNext?: boolean
 }
 
 export interface RailItem extends TitleCard {

@@ -4,17 +4,27 @@ import { claimTrailerSlot, releaseTrailerSlot } from './trailer-slot'
 import { loadYouTubeApi, type YTPlayer } from './youtube-api'
 
 /**
+ * How long YouTube keeps its own overlay (title bar, big play / pause buttons, logo) on screen after playback
+ * starts, resumes after buffering, or restarts. A preview stays hidden behind its backdrop until then.
+ */
+const OVERLAY_CLEAR_MS = 3200
+
+/**
  * A YouTube trailer through the IFrame API on youtube-nocookie.com. It creates its iframe only when
  * mounted, and only after claiming the app's single trailer slot (any other trailer is destroyed first).
- * `preview`: muted, no controls, looping, and scaled up a little so YouTube's title bar and logo are
- * cropped off. It fades in only once the video is actually playing, so there is never a black box.
+ *
+ * `preview` (hover cards, the details hero): muted, no controls, no pointer input, and shown only once it
+ * has played cleanly for a few seconds, past YouTube's start-up overlay. Buffering or a pause hides it
+ * again until it's clean. It loops by restarting itself behind the backdrop (YouTube's own loop shows the
+ * overlay and end-screen suggestions). `onVisibleChange` tells the parent when to fade its backdrop.
+ * Without `preview` it is the normal player with controls and sound, shown as soon as it plays.
  */
 export function YouTubeTrailer({
   videoKey,
   title,
   muted = true,
   preview = true,
-  onPlaying,
+  onVisibleChange,
   onEnded,
   onError,
   className,
@@ -24,18 +34,18 @@ export function YouTubeTrailer({
   title: string
   muted?: boolean
   preview?: boolean
-  onPlaying?: () => void
+  onVisibleChange?: (visible: boolean) => void
   onEnded?: () => void
   onError?: () => void
   className?: string
 }) {
   const host = useRef<HTMLDivElement>(null)
   const player = useRef<YTPlayer | null>(null)
-  const [playing, setPlaying] = useState(false)
+  const [visible, setVisible] = useState(false)
   // the latest props, read by the player's event handlers without re-creating the player
-  const latest = useRef({ muted, onPlaying, onEnded, onError })
+  const latest = useRef({ muted, onVisibleChange, onEnded, onError })
   useEffect(() => {
-    latest.current = { muted, onPlaying, onEnded, onError }
+    latest.current = { muted, onVisibleChange, onEnded, onError }
   })
 
   useEffect(() => {
@@ -44,12 +54,20 @@ export function YouTubeTrailer({
     const id = Symbol(videoKey)
     let cancelled = false
     let disposed = false
+    let revealTimer = 0
     const mountPoint = document.createElement('div')
     el.append(mountPoint)
+
+    const show = (next: boolean) => {
+      window.clearTimeout(revealTimer)
+      setVisible(next)
+      latest.current.onVisibleChange?.(next)
+    }
 
     const dispose = () => {
       if (disposed) return
       disposed = true
+      window.clearTimeout(revealTimer)
       try {
         player.current?.destroy()
       } catch {
@@ -57,7 +75,7 @@ export function YouTubeTrailer({
       }
       player.current = null
       el.replaceChildren()
-      setPlaying(false)
+      show(false)
     }
 
     loadYouTubeApi()
@@ -81,7 +99,6 @@ export function YouTubeTrailer({
             iv_load_policy: 3,
             // previews are silent: captions would cover the picture
             ...(preview ? { cc_load_policy: 0 } : {}),
-            ...(preview ? { loop: 1, playlist: videoKey } : {}),
           },
           events: {
             onReady: (e) => {
@@ -90,10 +107,24 @@ export function YouTubeTrailer({
             },
             onStateChange: (e) => {
               if (e.data === YT.PlayerState.PLAYING) {
-                setPlaying(true)
-                latest.current.onPlaying?.()
+                if (!preview) return show(true)
+                // wait out YouTube's overlay before showing anything
+                window.clearTimeout(revealTimer)
+                revealTimer = window.setTimeout(
+                  () => show(true),
+                  OVERLAY_CLEAR_MS
+                )
               } else if (e.data === YT.PlayerState.ENDED) {
                 latest.current.onEnded?.()
+                if (preview) {
+                  // loop behind the backdrop: no end screen, no overlay on the way round
+                  show(false)
+                  e.target.seekTo(0, true)
+                  e.target.playVideo()
+                }
+              } else if (preview) {
+                // buffering, paused or cued: YouTube's overlay is back, so hide until it's clean again
+                show(false)
               }
             },
             onError: () => latest.current.onError?.(),
@@ -128,9 +159,9 @@ export function YouTubeTrailer({
       ref={host}
       aria-hidden={preview || undefined}
       className={cn(
-        'overflow-hidden transition-opacity duration-500 [&>iframe]:size-full [&>iframe]:border-0',
+        'overflow-hidden transition-opacity duration-700 [&>iframe]:size-full [&>iframe]:border-0',
         preview ? 'pointer-events-none scale-[1.22]' : 'pointer-events-auto',
-        playing ? 'opacity-100' : 'opacity-0',
+        visible ? 'opacity-100' : 'opacity-0',
         className
       )}
     />

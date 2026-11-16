@@ -498,7 +498,7 @@ export function FilmstripHero({
       {/* title block, sitting just above the strip */}
       <div
         ref={copyRef}
-        className='absolute inset-x-0 top-0 shell flex flex-col justify-end pb-[3svh]'
+        className='absolute inset-x-0 top-0 flex shell flex-col justify-end pb-[3svh]'
         style={{ height: `${STRIP_TOP * 100}%` }}
       >
         <div className='flex w-full flex-wrap items-end gap-x-12 gap-y-4'>

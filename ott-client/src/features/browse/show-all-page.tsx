@@ -9,7 +9,11 @@ import { BROWSE_COPY } from './copy'
 import { TitleGrid } from './title-grid'
 
 const TYPES: TitleType[] = ['movie', 'series', 'reality']
-const PERSONAL: RailKey[] = ['continue-watching', 'because-you-watched']
+const PERSONAL: RailKey[] = [
+  'continue-watching',
+  'because-you-watched',
+  'because-you-watched-2',
+]
 
 /** /browse/:key?type=: every title of one rail as an infinite grid, with the FilterBar */
 export function ShowAllPage() {

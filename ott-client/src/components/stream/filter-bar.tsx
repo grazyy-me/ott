@@ -104,7 +104,7 @@ export function FilterBar({
   const sort = filters.sort ?? defaultSort
 
   return (
-    <div className={cn('shell flex flex-col gap-4', className)}>
+    <div className={cn('flex shell flex-col gap-4', className)}>
       <div className='flex flex-wrap items-center gap-2'>
         {loading ? (
           // skeleton pills while the options load, the same size as the real controls

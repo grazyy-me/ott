@@ -157,20 +157,6 @@ export const router = createBrowserRouter([
                 .TitlePage,
             }),
           },
-          // the player (playback phase); for now a placeholder. Playing needs an account.
-          {
-            element: <ProtectedRoute />,
-            children: ['/watch/:slug', '/watch/:slug/:episodeId'].map(
-              (path) => ({
-                path,
-                lazy: async () => ({
-                  Component: (
-                    await import('@/features/watch/watch-placeholder')
-                  ).WatchPlaceholder,
-                }),
-              })
-            ),
-          },
           {
             path: '/browse/:key',
             lazy: async () => ({
@@ -203,6 +189,18 @@ export const router = createBrowserRouter([
             }),
           },
         ],
+      },
+
+      // The player: full screen, outside the stream shell (no navbar, footer or Lenis). Playing needs an account.
+      {
+        element: <ProtectedRoute />,
+        children: ['/watch/:slug', '/watch/:slug/:episodeId'].map((path) => ({
+          path,
+          lazy: async () => ({
+            Component: (await import('@/features/watch/player-page'))
+              .PlayerPage,
+          }),
+        })),
       },
 
       // Error pages

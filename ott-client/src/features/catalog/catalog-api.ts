@@ -84,7 +84,10 @@ export interface RailTitlesArg extends BrowseFilters {
 
 const GRID_PAGE_SIZE = 24
 
-export const railsApi = baseApi.injectEndpoints({
+// rail data changes when progress does (Continue Watching, Because You Watched): tagged so it refetches
+const railsBase = baseApi.enhanceEndpoints({ addTagTypes: ['Rails'] })
+
+export const railsApi = railsBase.injectEndpoints({
   endpoints: (build) => ({
     /**
      * Every rail of a page in one request. `signedIn` is part of the cache key, so signing in or out
@@ -94,8 +97,13 @@ export const railsApi = baseApi.injectEndpoints({
       ApiResponse<{ page: RailPageKey; rails: Rail[] }>,
       { page: RailPageKey; signedIn: boolean }
     >({
-      query: ({ page }) => ({ url: '/rails', params: { page } }),
+      // Home's rails are the recommendations endpoint (view-ranked and personal); other pages use /rails
+      query: ({ page }) =>
+        page === 'home'
+          ? '/recommendations/home'
+          : { url: '/rails', params: { page } },
       keepUnusedDataFor: KEEP_FOR_SECONDS,
+      providesTags: ['Rails'],
     }),
 
     /** "Show all" and filtered browse: one rail's titles, page after page (infinite scroll) */
@@ -116,6 +124,7 @@ export const railsApi = baseApi.injectEndpoints({
         params: { ...params, page: pageParam, limit: GRID_PAGE_SIZE },
       }),
       keepUnusedDataFor: KEEP_FOR_SECONDS,
+      providesTags: ['Rails'],
     }),
 
     /** Countries, languages and year range present, for the FilterBar */

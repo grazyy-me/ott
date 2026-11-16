@@ -27,7 +27,7 @@ export function PosterRail({
       <Stagger
         key={posters.length}
         as='ul'
-        className='shell mt-5 no-scrollbar flex snap-x scroll-px-[clamp(1.25rem,4vw,3rem)] gap-3 overflow-x-auto pb-2 sm:gap-4'
+        className='mt-5 no-scrollbar flex shell snap-x scroll-px-[clamp(1.25rem,4vw,3rem)] gap-3 overflow-x-auto pb-2 sm:gap-4'
         step={45}
         y={24}
       >

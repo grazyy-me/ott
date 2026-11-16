@@ -21,7 +21,7 @@ export function LandscapeRail({
       key={cards.length}
       as='ul'
       aria-label={label}
-      className='shell mt-10 no-scrollbar flex snap-x scroll-px-[clamp(1.25rem,4vw,3rem)] gap-4 overflow-x-auto pb-4'
+      className='mt-10 no-scrollbar flex shell snap-x scroll-px-[clamp(1.25rem,4vw,3rem)] gap-4 overflow-x-auto pb-4'
       step={70}
       y={32}
     >

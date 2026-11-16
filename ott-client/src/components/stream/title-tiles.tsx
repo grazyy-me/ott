@@ -3,6 +3,7 @@ import type { RailItem } from '@/types/catalog'
 import { lengthLabel } from '@/lib/title-format'
 import { tmdbImage } from '@/lib/tmdb-image'
 import { cn } from '@/lib/utils'
+import { ContinueTile } from './continue-tile'
 import { TitleLink } from './title-link'
 
 const metaLine = (t: RailItem) =>
@@ -18,13 +19,6 @@ const releaseLabel = (iso: string | null) =>
         year: 'numeric',
       })
     : 'Date to be announced'
-
-const timeLeft = (p: NonNullable<RailItem['progress']>) => {
-  const min = Math.max(1, Math.round((p.durationSec - p.positionSec) / 60))
-  return min >= 60
-    ? `${Math.floor(min / 60)} h ${min % 60} min left`
-    : `${min} min left`
-}
 
 /** Small glass label on a tile, e.g. "Free" or a release date */
 function Badge({ children }: { children: ReactNode }) {
@@ -80,8 +74,9 @@ export function LandscapeTile({
   variant?: 'default' | 'continue' | 'coming'
   className?: string
 }) {
-  const progress = t.progress
-  const episode = progress?.episode
+  // Continue Watching resumes playback and can be removed: its own card
+  if (variant === 'continue')
+    return <ContinueTile title={t} className={className} />
   return (
     <TitleLink title={t} className={cn('group block rounded-2xl', className)}>
       <div
@@ -110,40 +105,21 @@ export function LandscapeTile({
         )}
         <div className='absolute inset-x-0 bottom-0 p-4 md:p-5'>
           <p className='text-eyebrow font-semibold text-foreground/70 uppercase'>
-            {variant === 'continue' && episode
-              ? `S${episode.seasonNumber} · E${episode.episodeNumber}`
-              : (t.genres[0]?.name ?? '')}
+            {t.genres[0]?.name ?? ''}
           </p>
           <p className='mt-1.5 truncate font-display text-lg font-bold md:text-xl'>
             {t.title}
           </p>
           <p className='mt-0.5 truncate text-sm text-foreground/70'>
-            {variant === 'continue' && progress
-              ? timeLeft(progress)
-              : [
-                  t.year,
-                  t.type === 'movie' ? null : lengthLabel(t),
-                  t.rating ? `${t.rating.toFixed(1)} ★` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+            {[
+              t.year,
+              t.type === 'movie' ? null : lengthLabel(t),
+              t.rating ? `${t.rating.toFixed(1)} ★` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
         </div>
-        {variant === 'continue' && progress && (
-          <div
-            className='absolute inset-x-0 bottom-0 h-1 bg-foreground/15'
-            role='progressbar'
-            aria-label={`${progress.percent}% watched`}
-            aria-valuenow={progress.percent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            <div
-              className='h-full bg-stream-gradient'
-              style={{ width: `${progress.percent}%` }}
-            />
-          </div>
-        )}
       </div>
     </TitleLink>
   )
