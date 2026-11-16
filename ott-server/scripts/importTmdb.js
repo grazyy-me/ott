@@ -5,6 +5,7 @@
 //   npm run seed:tmdb -- --movies=20 --series=10 --reality=5 --free=3
 //   npm run seed:tmdb -- --movies=0 --series=0 --reality=0     only the regional batches (see REGIONS)
 //   options: --movies --series --reality --free --concurrency=6 --max-seasons=10 --regions=false
+//            --awards=false --upcoming=24 --formats=false
 //
 // Needs TMDB_API_KEY (v3) or TMDB_READ_TOKEN (v4) in .env. TMDB_BASE_URL overrides the API host (used by tests).
 import dns from 'node:dns';
@@ -66,6 +67,55 @@ const REGIONS = [
   { code: 'zh', name: 'China', quota: [6, 4, 0] },
   { code: 'th', name: 'Thailand', quota: [3, 3, 0] },
 ];
+// Award winners: TMDB has no awards data, so this is a curated list (Oscar Best Picture, Emmy Outstanding
+// Drama / Comedy Series). They are imported if missing and get an `awards` label for the Award Winners rail.
+// Turn off with --awards=false. Add entries as "movie:<tmdbId>" or "tv:<tmdbId>".
+const AWARDS = new Map([
+  ['movie:1064213', ['Oscar · Best Picture (2025)']], // Anora
+  ['movie:872585', ['Oscar · Best Picture (2024)']], // Oppenheimer
+  ['movie:545611', ['Oscar · Best Picture (2023)']], // Everything Everywhere All at Once
+  ['movie:776503', ['Oscar · Best Picture (2022)']], // CODA
+  ['movie:581734', ['Oscar · Best Picture (2021)']], // Nomadland
+  ['movie:496243', ['Oscar · Best Picture (2020)']], // Parasite
+  ['movie:490132', ['Oscar · Best Picture (2019)']], // Green Book
+  ['movie:399055', ['Oscar · Best Picture (2018)']], // The Shape of Water
+  ['movie:376867', ['Oscar · Best Picture (2017)']], // Moonlight
+  ['movie:314365', ['Oscar · Best Picture (2016)']], // Spotlight
+  ['movie:194662', ['Oscar · Best Picture (2015)']], // Birdman
+  ['movie:76203', ['Oscar · Best Picture (2014)']], // 12 Years a Slave
+  ['movie:68734', ['Oscar · Best Picture (2013)']], // Argo
+  ['movie:45269', ['Oscar · Best Picture (2011)']], // The King's Speech
+  ['movie:12405', ['Oscar · Best Picture (2009)']], // Slumdog Millionaire
+  ['movie:6977', ['Oscar · Best Picture (2008)']], // No Country for Old Men
+  ['movie:1422', ['Oscar · Best Picture (2007)']], // The Departed
+  ['movie:122', ['Oscar · Best Picture (2004)']], // The Lord of the Rings: The Return of the King
+  ['movie:98', ['Oscar · Best Picture (2001)']], // Gladiator
+  ['movie:597', ['Oscar · Best Picture (1998)']], // Titanic
+  ['movie:13', ['Oscar · Best Picture (1995)']], // Forrest Gump
+  ['movie:424', ['Oscar · Best Picture (1994)']], // Schindler's List
+  ['movie:274', ['Oscar · Best Picture (1992)']], // The Silence of the Lambs
+  ['movie:238', ['Oscar · Best Picture (1973)']], // The Godfather
+  ['tv:126308', ['Emmy · Outstanding Drama Series (2024)']], // Shōgun
+  ['tv:76331', ['Emmy · Outstanding Drama Series (2023)']], // Succession
+  ['tv:65494', ['Emmy · Outstanding Drama Series (2021)']], // The Crown
+  ['tv:1399', ['Emmy · Outstanding Drama Series (2019)']], // Game of Thrones
+  ['tv:1396', ['Emmy · Outstanding Drama Series (2014)']], // Breaking Bad
+  ['tv:1104', ['Emmy · Outstanding Drama Series (2011)']], // Mad Men
+  ['tv:136315', ['Emmy · Outstanding Comedy Series (2023)']], // The Bear
+  ['tv:97546', ['Emmy · Outstanding Comedy Series (2021)']], // Ted Lasso
+  ['tv:61662', ['Emmy · Outstanding Comedy Series (2020)']], // Schitt's Creek
+  ['tv:67070', ['Emmy · Outstanding Comedy Series (2019)']], // Fleabag
+]);
+
+// Upcoming releases for the Coming Soon rail (none came in through the popularity lists). --upcoming=0 skips.
+const UPCOMING = intArg('upcoming', 24);
+// Reality formats found through TMDB keyword search, so the Dating / Docu-reality rails have enough titles.
+// --formats=false skips.
+const REALITY_FORMATS = [
+  { label: 'dating', keywords: ['dating', 'dating show', 'matchmaking'], target: 12 },
+  { label: 'docu-reality', keywords: ['docuseries', 'docudrama', 'reality documentary'], target: 10 },
+];
+
 const REGION_SPARE = 2; // regional titles are skipped more often (no English overview), so look at twice as many
 
 // ---------------------------------------------------------------- TMDB client (rate-limit aware)
@@ -321,7 +371,7 @@ async function importSeasons(titleDoc, tmdbId, d) {
 async function importTitle(kind, id, genreIds) {
   const d = await tmdb(`/${kind}/${id}`, {
     language: 'en-US',
-    append_to_response: 'credits,videos',
+    append_to_response: 'credits,videos,keywords',
     include_video_language: 'en,null',
   });
   if (!d) return 'missing';
@@ -371,8 +421,13 @@ async function importTitle(kind, id, genreIds) {
       .map((c) => ({ person: personIds.get(c.person.id), job: c.job })),
     numberOfSeasons: d.number_of_seasons ?? 0,
     numberOfEpisodes: d.number_of_episodes ?? 0,
+    // movies return { keywords: [...] }, tv returns { results: [...] }
+    keywords: unique((d.keywords?.keywords ?? d.keywords?.results ?? []).map((k) => k.name?.toLowerCase())),
     tmdbSyncedAt: new Date(),
   };
+  // only titles on the curated list get labels, so labels an admin adds later are never wiped
+  const awards = AWARDS.get(`${kind}:${id}`);
+  if (awards) fields.awards = awards;
 
   const { slug, isNew } = await resolveSlug(kind, id, name, year);
   const upsertTitle = (slugToUse) =>
@@ -604,6 +659,76 @@ async function main() {
         reality,
         { ...lang, with_genres: REALITY_GENRE, 'vote_count.gte': 10 },
         { ...lang, with_genres: REALITY_GENRE, 'vote_count.gte': 0 },
+        genreIds,
+        summary,
+        REGION_SPARE
+      );
+    }
+  }
+
+  if (args.awards !== 'false') {
+    console.log('Award winners...');
+    const result = { imported: 0, skipped: 0, missing: 0, failed: 0 };
+    for (const key of AWARDS.keys()) {
+      const [kind, id] = key.split(':');
+      try {
+        result[await importTitle(kind, Number(id), genreIds)] += 1;
+      } catch (err) {
+        result.failed += 1;
+        summary.failures.push(`award ${key}: ${err.message}`);
+      }
+    }
+    summary.results.awards = result;
+    console.log(`  [awards] done: ${result.imported} imported, ${result.missing} not on TMDB, ${result.failed} failed`);
+  }
+
+  if (UPCOMING > 0) {
+    console.log('Upcoming releases...');
+    const today = new Date().toISOString().slice(0, 10);
+    const movieTarget = Math.ceil((UPCOMING * 2) / 3);
+    // theatrical and digital releases only; no vote floor, upcoming titles have no votes yet
+    await importBatch(
+      'upcoming movies',
+      'movie',
+      movieTarget,
+      { 'primary_release_date.gte': today, with_release_type: '2|3|4' },
+      null,
+      genreIds,
+      summary,
+      REGION_SPARE
+    );
+    await importBatch(
+      'upcoming series',
+      'tv',
+      UPCOMING - movieTarget,
+      { 'first_air_date.gte': today, without_genres: NOT_SERIES_GENRES },
+      null,
+      genreIds,
+      summary,
+      REGION_SPARE
+    );
+  }
+
+  if (args.formats !== 'false') {
+    console.log('Reality formats...');
+    for (const format of REALITY_FORMATS) {
+      // TMDB keyword ids aren't stable to hard-code, so look them up by name
+      const ids = [];
+      for (const name of format.keywords) {
+        const found = await tmdb('/search/keyword', { query: name });
+        const match = found?.results?.find((k) => k.name.toLowerCase() === name) ?? found?.results?.[0];
+        if (match) ids.push(match.id);
+      }
+      if (!ids.length) {
+        console.log(`  [${format.label}] no TMDB keyword found, skipped`);
+        continue;
+      }
+      await importBatch(
+        `${format.label} reality`,
+        'tv',
+        format.target,
+        { with_genres: REALITY_GENRE, with_keywords: ids.join('|') },
+        null,
         genreIds,
         summary,
         REGION_SPARE

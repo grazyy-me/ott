@@ -54,6 +54,10 @@ const titleSchema = new mongoose.Schema(
     isPublished: { type: Boolean, default: true },
     viewCount: { type: Number, default: 0 },
     tmdbSyncedAt: { type: Date },
+    // TMDB keywords, lower-cased ("dating", "competition", "docuseries"...): used by the reality format rails
+    keywords: { type: [String], default: [] },
+    // award labels, e.g. "Oscar · Best Picture (2020)"; set by the import for a curated list (scripts/importTmdb.js)
+    awards: { type: [String], default: [] },
   },
   { timestamps: true }
 );
@@ -70,6 +74,8 @@ titleSchema.index({ type: 1, isPublished: 1, releaseDate: -1 });
 titleSchema.index({ type: 1, isPublished: 1, viewCount: -1, popularity: -1 });
 titleSchema.index({ type: 1, isPublished: 1, rating: -1 });
 titleSchema.index({ isFree: 1 });
+titleSchema.index({ keywords: 1 });
+titleSchema.index({ awards: 1 });
 
 titleSchema.plugin(toJSON);
 titleSchema.plugin(paginate);

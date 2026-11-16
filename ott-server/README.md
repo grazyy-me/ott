@@ -40,14 +40,38 @@ All routes are under `/v1`. Success responses are `{ statusCode, data, message, 
 | PATCH | `/users/me/avatar` | Bearer | `multipart/form-data`, field `avatar` |
 | GET / POST | `/users` | admin | List (paginated) / create |
 | GET / PATCH / DELETE | `/users/:userId` | admin | |
-| GET | `/titles` | | Query: `type` (movie\|series\|reality), `genre` (slug), `country` (ISO 3166-1), `language` (ISO 639-1), `year`, `sort` (latest\|popular\|rating), `free`, `page`, `limit` (max 50). Returns `{ results, page, limit, totalPages, totalResults }` |
+| GET | `/titles` | | Query: `type` (movie\|series\|reality), `genre` (slug), `country` (ISO 3166-1), `language` (ISO 639-1), `year`, `sort` (latest\|popular\|rating\|trending), `release` (released\|upcoming), `free`, `page`, `limit` (max 50). Returns `{ results, page, limit, totalPages, totalResults }` |
 | GET | `/titles/:slug` | | Full details: genres, cast (ordered), crew, `director`, seasons. Never includes `videoUrl` |
 | GET | `/titles/:id/similar` | | Same type, ranked by shared genres. `?limit=` (max 24, default 12) |
 | GET | `/titles/:id/seasons/:seasonNumber/episodes` | | Season and its episodes |
 | GET | `/genres` | | Genres with title counts; `?type=` counts within one type |
 | GET | `/search?q=` | | Substring match on title; `q` needs 2+ characters. Also `type`, `page`, `limit` |
+| GET | `/titles/facets` | | FilterBar options: `{ countries: [{ code, count }], languages: [{ code, count }], years: { min, max } }`; `?type=` narrows to one type |
+| GET | `/rails?page=` | optional Bearer | Every rail of a page (`home`, `movie`, `series` or `reality`), up to 16 titles each, as `{ rails: [{ key, title, total, items, source? }] }`. Empty rails are left out; Continue Watching and Because You Watched only appear signed in |
+| GET | `/rails/:key/titles` | optional Bearer | One rail's titles, paged (the "Show all" grid). Query: `type`, the FilterBar's `country`, `language`, `genre`, `year`, `sort` (latest\|popular\|rating, overrides the rail's own), `page`, `limit` (max 48). `key` `all` is every published title. Personal rails return 401 signed out |
+| GET | `/me/continue-watching` | Bearer | In-progress titles (not finished, newest first), each with `progress { positionSec, durationSec, percent, updatedAt, episode }`. `?type=`, `page`, `limit` |
+| PUT | `/me/progress` | Bearer | `{ titleId, episodeId?, positionSec, durationSec }`. Past 92% the item counts as finished and leaves Continue Watching |
+| DELETE | `/me/progress/:titleId` | Bearer | Removes a title from Continue Watching |
 
 Catalog routes validate with zod (`middlewares/validateZod.js`); bad input returns 400 with the failing fields.
+
+Rails are defined in one registry, `RAILS` in `services/rail.service.js`, and each page's row order in `PAGES`
+next to it. A rail is a set of filters plus a sort:
+
+| Key | Rows | Rule |
+| --- | --- | --- |
+| `continue-watching` | all pages | Signed in: unfinished progress, newest first |
+| `trending`, `latest`, `most-watched` | all pages | Released titles by TMDB popularity / release date / view count |
+| `because-you-watched` | home | Signed in: shares genres with the last title watched, watched titles excluded |
+| `top-rated` | all pages | By rating, with a vote floor of 1,000 for movies and series and 50 for reality |
+| `award-winners` | home, movie, series | Titles with `awards` (curated Oscar / Emmy list in the seed) |
+| `free` | all pages | `isFree` |
+| `binge-worthy` | home, series | Series with 3+ seasons rated 7.5+ |
+| `documentaries` | home | Documentary genre or keyword |
+| `coming-soon` | home, movie, series | Release date in the future, soonest first |
+| `competition`, `dating`, `docu-reality` | reality | TMDB keywords plus title patterns (admins can correct the tagging) |
+
+The `rating` sort skips titles with under 50 votes, and `latest` skips unreleased titles (those are Coming Soon).
 
 ## Seeding the catalog from TMDB
 
@@ -62,6 +86,10 @@ npm run seed:tmdb -- --movies=20 --series=10 --reality=5 --free=3   # a small te
 - After the global popularity lists it adds regional batches (the `REGIONS` list in the script): Hindi, Tamil, Telugu, Malayalam, Korean, Japanese, Spanish, French, German, Italian, Portuguese, Turkish, Chinese and Thai titles, picked by original language. Skip them with `--regions=false`, or run only them with `--movies=0 --series=0 --reality=0`.
 - Reality shows are TMDB TV titles in genre 10764. Talk shows, news and soaps are left out of "series".
 - Requests are spaced to stay under TMDB's limit, and a 429 pauses all workers for the `Retry-After` time.
+- It also stores TMDB keywords (used by the Documentaries, Competition, Dating and Docu-reality rails) and imports:
+  - the award winners in `AWARDS` (TMDB ids with an Oscar or Emmy label; skip with `--awards=false`)
+  - upcoming movies and series for Coming Soon (`--upcoming=24`; `0` skips)
+  - extra dating and docu-reality shows found by keyword (`--formats=false` skips)
 - Series and reality shows import seasons 1 to 10 (`--max-seasons`) with their episodes; "Specials" are skipped.
 - The free titles (8 movies, 4 series, 3 reality shows, best-rated first) get an open-licence demo HLS stream as `videoUrl`, and so do all their episodes. Replace them with real video later.
 

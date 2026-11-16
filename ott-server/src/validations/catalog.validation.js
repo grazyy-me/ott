@@ -21,7 +21,9 @@ export const listTitles = {
     country: z.string().length(2).toUpperCase().optional(), // ISO 3166-1, e.g. "IN"
     language: z.string().length(2).toLowerCase().optional(), // ISO 639-1, e.g. "hi"
     year: z.coerce.number().int().min(1888).max(2100).optional(),
-    sort: z.enum(['latest', 'popular', 'rating']).default('latest'),
+    sort: z.enum(['latest', 'popular', 'rating', 'trending']).default('latest'),
+    // released (date passed) or upcoming (Coming Soon)
+    release: z.enum(['released', 'upcoming']).optional(),
     free: booleanFlag.optional(),
     page,
     limit: limit(),

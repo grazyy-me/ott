@@ -5,19 +5,23 @@ import { Title, Genre, Season, Episode } from '../models/index.js';
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Cards and rails don't need the credits; videoUrl is private and stripped by toJSON anyway
-const CARD_FIELDS = '-cast -crew -videoUrl';
+export const CARD_FIELDS = '-cast -crew -videoUrl -keywords';
 
-const SORTS = {
+export const SORTS = {
   latest: { releaseDate: -1, _id: -1 },
-  // viewCount starts at 0 for everything, so TMDB popularity breaks the ties until real views arrive
+  // "Most watched": viewCount starts at 0 for everything, so TMDB popularity breaks ties until real views arrive
   popular: { viewCount: -1, popularity: -1, _id: -1 },
   rating: { rating: -1, voteCount: -1, _id: -1 },
+  // what people are looking at right now on TMDB
+  trending: { popularity: -1, _id: -1 },
+  // Coming Soon: the nearest release first
+  soonest: { releaseDate: 1, _id: 1 },
 };
 
 // Below this many votes a 10/10 is noise, so the "rating" sort ignores such titles
 const MIN_VOTES_FOR_RATING_SORT = 50;
 
-const paged = (results, page, limit, totalResults) => ({
+export const paged = (results, page, limit, totalResults) => ({
   results,
   page,
   limit,
@@ -25,10 +29,38 @@ const paged = (results, page, limit, totalResults) => ({
   totalResults,
 });
 
-const emptyPage = (page, limit) => paged([], page, limit, 0);
+export const emptyPage = (page, limit) => paged([], page, limit, 0);
 
-/** GET /titles */
-export const listTitles = async ({ type, genre, country, language, year, sort, free, page, limit }) => {
+const genreIdsFor = async (slugs) =>
+  (
+    await Genre.find({ slug: { $in: slugs } })
+      .select('_id')
+      .lean()
+  ).map((g) => g._id);
+
+/**
+ * The Mongo filter behind every title list: the public filters (type, genre, country, language, year, free)
+ * plus the rail-only ones (release, award, minSeasons, minRating, minVotes, and "any of" genres / keywords / text pattern).
+ * Returns null when a requested genre doesn't exist, which means an empty result.
+ */
+export const buildTitleFilter = async ({
+  type,
+  genre,
+  country,
+  language,
+  year,
+  free,
+  sort,
+  release,
+  award,
+  minSeasons,
+  minRating,
+  minVotes,
+  genreAny,
+  keywordsAny,
+  pattern,
+  excludeIds,
+} = {}) => {
   const filter = { isPublished: true };
   if (type) filter.type = type;
   if (country) filter.countries = country;
@@ -36,23 +68,82 @@ export const listTitles = async ({ type, genre, country, language, year, sort, f
   if (year) filter.year = year;
   if (typeof free === 'boolean') filter.isFree = free;
   if (sort === 'rating') filter.voteCount = { $gte: MIN_VOTES_FOR_RATING_SORT };
+  if (release === 'released') filter.releaseDate = { $lte: new Date() };
+  if (release === 'upcoming') filter.releaseDate = { $gt: new Date() };
+  // "Latest" means latest out: unreleased titles belong to Coming Soon, not the top of this sort
+  if (sort === 'latest' && !release) filter.releaseDate = { $lte: new Date() };
+  if (award) filter['awards.0'] = { $exists: true };
+  if (minSeasons) filter.numberOfSeasons = { $gte: minSeasons };
+  if (minRating) filter.rating = { $gte: minRating };
+  // per-type vote floor ({ movie, series, reality }): reality shows get far fewer votes than films
+  if (minVotes) {
+    const floor = (t) => Math.max(minVotes[t] ?? 0, sort === 'rating' ? MIN_VOTES_FOR_RATING_SORT : 0);
+    if (type) filter.voteCount = { $gte: floor(type) };
+    else filter.$and = [{ $or: Object.keys(minVotes).map((t) => ({ type: t, voteCount: { $gte: floor(t) } })) }];
+  }
+  if (excludeIds?.length) filter._id = { $nin: excludeIds };
 
   if (genre) {
-    const genreDoc = await Genre.findOne({ slug: genre }).select('_id').lean();
-    if (!genreDoc) return emptyPage(page, limit);
-    filter.genres = genreDoc._id;
+    const [id] = await genreIdsFor([genre]);
+    if (!id) return null;
+    filter.genres = id;
   }
 
+  // "any of these": a title qualifies through a genre, a keyword, or its title/overview text
+  const any = [];
+  if (genreAny?.length) any.push({ genres: { $in: await genreIdsFor(genreAny) } });
+  if (keywordsAny?.length) any.push({ keywords: { $in: keywordsAny } });
+  if (pattern) any.push({ title: pattern }, { overview: pattern });
+  if (any.length) filter.$or = any;
+
+  return filter;
+};
+
+/** One page of cards for a filter */
+export const findTitlesPage = async (filter, sort, page, limit) => {
   const [results, totalResults] = await Promise.all([
     Title.find(filter)
       .select(CARD_FIELDS)
       .populate('genres', 'name slug')
-      .sort(SORTS[sort])
+      .sort(sort)
       .skip((page - 1) * limit)
       .limit(limit),
     Title.countDocuments(filter),
   ]);
   return paged(results, page, limit, totalResults);
+};
+
+/** GET /titles */
+export const listTitles = async (params) => {
+  const { sort, page, limit } = params;
+  const filter = await buildTitleFilter(params);
+  if (!filter) return emptyPage(page, limit);
+  return findTitlesPage(filter, SORTS[sort], page, limit);
+};
+
+/** GET /titles/facets: the countries, languages and year range present, for the filter dropdowns */
+export const getFacets = async ({ type }) => {
+  const match = { isPublished: true };
+  if (type) match.type = type;
+  const [result] = await Title.aggregate([
+    { $match: match },
+    {
+      $facet: {
+        countries: [{ $unwind: '$countries' }, { $group: { _id: '$countries', count: { $sum: 1 } } }],
+        languages: [{ $unwind: '$languages' }, { $group: { _id: '$languages', count: { $sum: 1 } } }],
+        years: [
+          { $match: { year: { $ne: null } } },
+          { $group: { _id: null, min: { $min: '$year' }, max: { $max: '$year' } } },
+        ],
+      },
+    },
+  ]);
+  const byCount = (rows) => rows.sort((a, b) => b.count - a.count).map((r) => ({ code: r._id, count: r.count }));
+  return {
+    countries: byCount(result.countries),
+    languages: byCount(result.languages),
+    years: result.years[0] ? { min: result.years[0].min, max: result.years[0].max } : null,
+  };
 };
 
 /** GET /titles/:slug — everything the detail page needs, minus episodes (see getEpisodes) */

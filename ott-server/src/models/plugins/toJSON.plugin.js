@@ -24,8 +24,11 @@ const toJSON = (schema) => {
         }
       });
 
-      ret.id = ret._id.toString();
-      delete ret._id;
+      // subdocuments declared with { _id: false } (cast, crew) have no _id
+      if (ret._id != null) {
+        ret.id = ret._id.toString();
+        delete ret._id;
+      }
       delete ret.__v;
       if (transform) {
         return transform(doc, ret, options);
