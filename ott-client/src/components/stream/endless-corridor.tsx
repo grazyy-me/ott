@@ -15,7 +15,8 @@ const Z_FAR = -2400
 const Z_NEAR = 780
 const RANGE = Z_NEAR - Z_FAR
 const LOOP_MS = 16000
-const FADE_IN = 0.06
+// distant posters converge behind the headline, so they stay faint for longer before fading in fully
+const FADE_IN = 0.24
 const FADE_OUT = 0.04
 
 const opacityFor = (progress: number) => {
@@ -35,6 +36,8 @@ type EndlessCorridorProps = {
   images: string[]
   title: ReactNode
   caption?: ReactNode
+  /** Interactive content under the caption, e.g. a call-to-action link */
+  children?: ReactNode
   className?: string
 }
 
@@ -42,6 +45,7 @@ export function EndlessCorridor({
   images,
   title,
   caption,
+  children,
   className,
 }: EndlessCorridorProps) {
   const rootRef = useRef<HTMLElement>(null)
@@ -148,13 +152,30 @@ export function EndlessCorridor({
         aria-hidden='true'
         className='pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_30%,var(--background)_85%)]'
       />
+      {/* top and bottom fade into the page, so the corridor reads as an interlude, not a box */}
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-background to-transparent'
+      />
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-background to-transparent'
+      />
+      {/* a soft vignette behind the words, so passing posters never print over them */}
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(ellipse_42%_32%_at_center,var(--background)_0%,color-mix(in_oklch,var(--background)_75%,transparent)_45%,transparent_100%)]'
+      />
       <div className='pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center px-6 text-center'>
-        <h2 className='font-display text-display-2 font-bold'>{title}</h2>
+        <h2 className='max-w-[14ch] font-display text-display-1 font-bold text-balance'>
+          {title}
+        </h2>
         {caption && (
-          <p className='mt-4 max-w-md text-base text-foreground/75'>
+          <p className='mt-5 max-w-lg text-base text-foreground/80 md:text-lg'>
             {caption}
           </p>
         )}
+        {children && <div className='pointer-events-auto mt-8'>{children}</div>}
       </div>
     </section>
   )

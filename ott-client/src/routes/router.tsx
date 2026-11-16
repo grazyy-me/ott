@@ -8,9 +8,16 @@ import { ForbiddenError } from '@/features/errors/forbidden'
 import { GeneralError } from '@/features/errors/general-error'
 import { NotFoundError } from '@/features/errors/not-found-error'
 import { UnauthorisedError } from '@/features/errors/unauthorized-error'
+import { HOME_QUERIES } from '@/features/home/queries'
 import { LAB_TITLES_QUERY } from '@/features/lab/query'
 
 // Fires the request into the RTK Query cache without waiting; the page's hook picks up the same entry
+const prefetchHomeData = () => {
+  for (const query of Object.values(HOME_QUERIES)) {
+    store.dispatch(catalogApi.util.prefetch('getTitles', query, {}))
+  }
+}
+
 const prefetchLabData = () => {
   store.dispatch(catalogApi.util.prefetch('getTitles', LAB_TITLES_QUERY, {}))
 }
@@ -82,7 +89,7 @@ export const router = createBrowserRouter([
             }),
             children: [
               {
-                index: true,
+                path: '/dashboard',
                 lazy: async () => ({
                   Component: (await import('@/features/dashboard')).Dashboard,
                 }),
@@ -122,6 +129,17 @@ export const router = createBrowserRouter([
             .StreamLayout,
         }),
         children: [
+          {
+            path: '/',
+            // the hero and first rows' data starts loading in parallel with the page's code
+            loader: () => {
+              prefetchHomeData()
+              return null
+            },
+            lazy: async () => ({
+              Component: (await import('@/features/home')).Home,
+            }),
+          },
           {
             path: '/lab',
             // start the catalog request now, in parallel with downloading the page's code

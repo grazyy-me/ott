@@ -5,6 +5,7 @@ import { RouterProvider } from 'react-router'
 import { store } from './app/store'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
+import { MotionProvider } from './context/motion-provider'
 import { ThemeProvider } from './context/theme-provider'
 import { router } from './routes/router'
 import './styles/index.css'
@@ -17,7 +18,9 @@ if (!rootElement.innerHTML) {
         <ThemeProvider>
           <FontProvider>
             <DirectionProvider>
-              <RouterProvider router={router} />
+              <MotionProvider>
+                <RouterProvider router={router} />
+              </MotionProvider>
             </DirectionProvider>
           </FontProvider>
         </ThemeProvider>

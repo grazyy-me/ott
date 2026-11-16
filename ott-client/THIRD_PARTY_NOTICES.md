@@ -48,6 +48,7 @@ author) before a commercial launch.
 | `src/components/stream/endless-corridor.tsx` | Endless | helloweblisy |
 | `src/components/stream/curved-lens-carousel.tsx` | 3D Curved Carousel | kedhareswer |
 | `src/components/stream/chapter-hero.tsx` | Scroll-Triggered Video Hero | daiwiikharihar |
+| `src/components/motion/use-hide-on-scroll.ts` | Hide On Scroll (its useHideOnScroll hook) | ddoemonn |
 
 ## Fonts
 

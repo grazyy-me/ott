@@ -11,10 +11,14 @@ export interface MotionContextValue {
   systemReduced: boolean
   preference: MotionPreference
   setPreference: (preference: MotionPreference) => void
-  /** Whether Lenis smooth scrolling is running (it is off while motion is reduced) */
+  /** Whether Lenis smooth scrolling is running (only on stream pages, never with reduced motion) */
   smoothScroll: boolean
-  /** The live Lenis instance, for scrollTo and friends; null while motion is reduced */
+  /** The app's single Lenis instance, or null when it isn't running. Prefer useLenis(). */
+  lenis: Lenis | null
+  /** Same, without subscribing to changes (for event handlers) */
   getLenis: () => Lenis | null
+  /** Used by useSmoothScroll (StreamLayout) to hand the instance it created to the root */
+  attachLenis: (lenis: Lenis | null) => void
   /** Stops smooth scrolling (modals, player). Returns the matching unlock; locks nest. */
   lockScroll: () => () => void
 }

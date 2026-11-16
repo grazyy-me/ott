@@ -18,8 +18,10 @@ export type SelectorItem = {
   subtitle?: string
   image: string
   icon?: ReactNode
-  /** Link for the "More info" button on the open panel */
+  /** Link for the button on the open panel */
   href?: string
+  /** Button label; default "More info" */
+  cta?: string
 }
 
 type InteractiveSelectorProps = {
@@ -63,7 +65,7 @@ export function InteractiveSelector({
           <div
             key={item.id}
             className={cn(
-              'relative min-h-14 min-w-14 overflow-hidden rounded-2xl border',
+              'relative min-h-[4.5rem] min-w-14 overflow-hidden rounded-2xl border md:min-h-14',
               open ? 'border-foreground/40' : 'border-border',
               !reduced &&
                 'transition-[flex-grow,border-color] duration-700 ease-out-expo'
@@ -139,7 +141,7 @@ export function InteractiveSelector({
                     to={item.href}
                     className='pointer-events-auto mt-3 inline-flex h-9 items-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground'
                   >
-                    More info
+                    {item.cta ?? 'More info'}
                   </Link>
                 )}
               </div>

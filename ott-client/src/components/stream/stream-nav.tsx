@@ -4,25 +4,36 @@
  * Changes: react-router links with the active link taken from the URL; the sliding highlight is a measured
  * CSS-transition pill instead of a framer-motion layoutId, and the entrance runs on anime.js (CLAUDE.md keeps
  * framer-motion for route and modal transitions; the small-screen menu panel still uses AnimatePresence);
- * glass tokens; search and account actions in place of the single call-to-action button.
+ * glass tokens; search and a profile menu (kit DropdownMenu) in place of the single call-to-action button;
+ * hides on scroll down and shows on scroll up (useHideOnScroll, adapted from 21st.dev "Hide On Scroll").
  */
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router'
 import { animate } from 'animejs'
 import { AnimatePresence, m } from 'framer-motion'
-import { Search } from 'lucide-react'
+import { Bookmark, LogOut, Search, UserRound } from 'lucide-react'
 import { useAppSelector } from '@/app/hooks'
 import { APP_NAME } from '@/lib/config'
 import { cn } from '@/lib/utils'
-import { useMotion } from '@/components/motion'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useHideOnScroll, useMotion } from '@/components/motion'
+import { SignOutDialog } from '@/components/sign-out-dialog'
 import { UserAvatar } from '@/components/user-avatar'
 import { selectAuthStatus, selectCurrentUser } from '@/features/auth/auth-slice'
 
 const NAV_ITEMS = [
   { label: 'Home', to: '/' },
   { label: 'Movies', to: '/movies' },
-  { label: 'Series', to: '/series' },
-  { label: 'Reality', to: '/reality' },
+  { label: 'TV Series', to: '/series' },
+  { label: 'Reality Shows', to: '/reality' },
+  { label: 'My List', to: '/my-list' },
 ] as const
 
 const SPRING = {
@@ -148,25 +159,74 @@ function NavLinks({
   )
 }
 
-function AccountAction() {
-  const status = useAppSelector(selectAuthStatus)
+/** Signed-in profile menu, built on the kit's DropdownMenu and SignOutDialog */
+function ProfileMenu({
+  onOpenChange,
+}: {
+  onOpenChange?: (open: boolean) => void
+}) {
   const user = useAppSelector(selectCurrentUser)
+  const [signOutOpen, setSignOutOpen] = useState(false)
+
+  return (
+    <>
+      <DropdownMenu modal={false} onOpenChange={onOpenChange}>
+        <DropdownMenuTrigger
+          aria-label='Profile menu'
+          className='rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring'
+        >
+          <UserAvatar user={user} className='size-10' />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align='end'
+          sideOffset={10}
+          className='w-60 rounded-2xl glass-strong p-2'
+        >
+          <DropdownMenuLabel className='font-normal'>
+            <p className='truncate text-sm font-medium'>{user?.name}</p>
+            <p className='truncate text-xs text-muted-foreground'>
+              {user?.email}
+            </p>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild className='rounded-lg'>
+            <Link to='/my-list'>
+              <Bookmark aria-hidden='true' /> My List
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className='rounded-lg'>
+            <Link to='/settings'>
+              <UserRound aria-hidden='true' /> Account
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant='destructive'
+            className='rounded-lg'
+            onClick={() => setSignOutOpen(true)}
+          >
+            <LogOut aria-hidden='true' /> Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <SignOutDialog open={signOutOpen} onOpenChange={setSignOutOpen} />
+    </>
+  )
+}
+
+function AccountAction({
+  onMenuOpenChange,
+}: {
+  onMenuOpenChange?: (open: boolean) => void
+}) {
+  const status = useAppSelector(selectAuthStatus)
   const { pathname, search } = useLocation()
 
   // keep the slot's size while the session is being checked, so the bar doesn't shift
   if (status === 'checking')
-    return <span aria-hidden='true' className='size-10' />
-  if (status === 'authenticated') {
-    return (
-      <Link
-        to='/settings'
-        aria-label='Your account'
-        className='rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring'
-      >
-        <UserAvatar user={user} className='size-10' />
-      </Link>
-    )
-  }
+    return <span aria-hidden='true' className='block size-10' />
+  if (status === 'authenticated')
+    return <ProfileMenu onOpenChange={onMenuOpenChange} />
   return (
     <Link
       to={`/sign-in?redirect=${encodeURIComponent(pathname + search)}`}
@@ -183,7 +243,12 @@ export function StreamNav() {
   // the menu remembers the route it was opened on, so navigating anywhere closes it
   const [openOn, setOpenOn] = useState<string | null>(null)
   const open = openOn === pathname
-  const [scrolled, setScrolled] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [focusWithin, setFocusWithin] = useState(false)
+  // hide on scroll down, show on scroll up; never while a menu is open or focus is inside the bar
+  const { hidden, atTop } = useHideOnScroll({
+    pinned: open || profileOpen || focusWithin,
+  })
   const rootRef = useRef<HTMLDivElement>(null)
   const toggleRef = useRef<HTMLButtonElement>(null)
   const panelId = useId()
@@ -208,13 +273,6 @@ export function StreamNav() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
   // ... and on Escape, an outside click, or when the screen grows past the breakpoint
   useEffect(() => {
     if (!open) return
@@ -228,7 +286,7 @@ export function StreamNav() {
       if (rootRef.current && !rootRef.current.contains(e.target as Node))
         setOpenOn(null)
     }
-    const wide = window.matchMedia('(min-width: 768px)')
+    const wide = window.matchMedia('(min-width: 1024px)')
     const onWide = (e: MediaQueryListEvent) => e.matches && setOpenOn(null)
     document.addEventListener('keydown', onKeyDown)
     document.addEventListener('pointerdown', onPointerDown)
@@ -241,16 +299,31 @@ export function StreamNav() {
   }, [open])
 
   return (
-    <header className='pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-3 sm:top-4'>
+    <header
+      className={cn(
+        'pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-3 sm:top-4',
+        !reduced && 'transition-transform duration-500 ease-out-expo'
+      )}
+      style={{
+        transform: hidden
+          ? 'translate3d(0, calc(-100% - 1.5rem), 0)'
+          : undefined,
+      }}
+      onFocus={() => setFocusWithin(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+          setFocusWithin(false)
+      }}
+    >
       <div
         ref={rootRef}
-        className='pointer-events-auto relative w-full max-w-md md:w-auto md:max-w-none'
+        className='pointer-events-auto relative w-full max-w-md lg:w-auto lg:max-w-none'
       >
         <nav
           aria-label='Main'
           className={cn(
-            'relative flex items-center justify-between gap-2 rounded-full px-2 py-2 transition-[background-color] duration-300 md:gap-6',
-            scrolled ? 'glass-strong' : 'glass'
+            'relative flex items-center justify-between gap-2 rounded-full px-2 py-2 transition-[background-color] duration-300 lg:gap-6',
+            atTop ? 'glass' : 'glass-strong'
           )}
         >
           {/* thin light along the top edge */}
@@ -272,7 +345,7 @@ export function StreamNav() {
             </span>
           </Link>
 
-          <div className='hidden md:block'>
+          <div className='hidden lg:block'>
             <NavLinks />
           </div>
 
@@ -284,8 +357,8 @@ export function StreamNav() {
             >
               <Search className='size-[18px]' aria-hidden='true' />
             </Link>
-            <div className='hidden md:block'>
-              <AccountAction />
+            <div className='hidden lg:block'>
+              <AccountAction onMenuOpenChange={setProfileOpen} />
             </div>
 
             <button
@@ -295,7 +368,7 @@ export function StreamNav() {
               aria-expanded={open}
               aria-controls={panelId}
               aria-label={open ? 'Close menu' : 'Open menu'}
-              className='relative flex size-10 shrink-0 items-center justify-center rounded-full transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring md:hidden'
+              className='relative flex size-10 shrink-0 items-center justify-center rounded-full transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring lg:hidden'
             >
               <span aria-hidden='true' className='relative block h-3.5 w-5'>
                 <span
@@ -334,12 +407,12 @@ export function StreamNav() {
               }
               transition={reduced ? { duration: 0.1 } : SPRING}
               style={{ transformOrigin: 'top center' }}
-              className='absolute inset-x-0 top-full mt-2 rounded-3xl glass-strong p-2 md:hidden'
+              className='absolute inset-x-0 top-full mt-2 rounded-3xl glass-strong p-2 lg:hidden'
             >
               <NavLinks vertical onNavigate={() => setOpenOn(null)} />
               <div className='mt-2 flex items-center justify-between border-t border-border p-2 pt-3'>
                 <span className='text-sm text-muted-foreground'>Account</span>
-                <AccountAction />
+                <AccountAction onMenuOpenChange={setProfileOpen} />
               </div>
             </m.div>
           )}

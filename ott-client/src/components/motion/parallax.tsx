@@ -1,7 +1,6 @@
-import { useLayoutEffect, useRef, type ReactNode } from 'react'
-import { animate, onScroll, type JSAnimation } from 'animejs'
+import { useRef, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { useMotion } from './use-motion'
+import { useParallax } from './use-parallax'
 
 type ParallaxProps = {
   children: ReactNode
@@ -12,52 +11,14 @@ type ParallaxProps = {
 }
 
 /**
- * A clipped window whose content drifts against the scroll, tied 1:1 to scroll position (anime.js onScroll, synced).
- * The layer is oversized by `amount` above and below, so its edges never show.
- * Reduced motion: the layer sits still.
+ * Component form of useParallax(): a clipped window whose content drifts against the scroll.
+ * The layer is oversized by `amount` above and below, so its edges never show. Still with reduced motion.
  */
 export function Parallax({ children, className, amount = 12 }: ParallaxProps) {
   const windowRef = useRef<HTMLDivElement>(null)
   const layerRef = useRef<HTMLDivElement>(null)
-  const { reduced } = useMotion()
-
-  useLayoutEffect(() => {
-    const frame = windowRef.current
-    const layer = layerRef.current
-    if (!frame || !layer || reduced) return
-
-    let animation: JSAnimation | undefined
-    const build = () => {
-      animation?.revert()
-      const shift = (frame.offsetHeight * amount) / 100
-      animation = animate(layer, {
-        y: [-shift, shift],
-        ease: 'linear',
-        autoplay: onScroll({
-          target: frame,
-          // from the moment the window's top enters at the bottom until its bottom leaves at the top
-          enter: { target: 'top', container: 'bottom' },
-          leave: { target: 'bottom', container: 'top' },
-          sync: true,
-        }),
-      })
-    }
-    build()
-
-    // the shift depends on the window's height
-    let lastHeight = frame.offsetHeight
-    const resize = new ResizeObserver(() => {
-      if (frame.offsetHeight === lastHeight) return
-      lastHeight = frame.offsetHeight
-      build()
-    })
-    resize.observe(frame)
-
-    return () => {
-      resize.disconnect()
-      animation?.revert()
-    }
-  }, [reduced, amount])
+  // "through" centres the travel, so ratio 2a/100 means ±a% of the window height
+  useParallax(layerRef, { trigger: windowRef, ratio: (amount * 2) / 100 })
 
   return (
     <div ref={windowRef} className={cn('overflow-hidden', className)}>

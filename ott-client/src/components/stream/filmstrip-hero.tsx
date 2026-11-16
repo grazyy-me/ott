@@ -22,10 +22,11 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from 'react'
 import { animate, stagger, utils } from 'animejs'
 import { cn } from '@/lib/utils'
-import { useMotion } from '@/components/motion'
+import { useMotion, useParallax } from '@/components/motion'
 
 export interface FilmstripItem {
   id: string
@@ -51,6 +52,13 @@ interface FilmstripHeroProps {
   autoplayDelay?: number
   /** Buttons for the focused title, e.g. "More info" */
   actions?: (item: FilmstripItem) => ReactNode
+  /** A layer between the backdrop and the copy, e.g. the Three.js HeroAtmosphere */
+  atmosphere?: ReactNode
+  /**
+   * The pinned wrapper the page scrolls the hero inside. When given, the backdrop drifts slowest, the strip
+   * faster and the title block fastest as that wrapper scrolls (useParallax, range "pin").
+   */
+  parallaxTrigger?: RefObject<HTMLElement | null>
   className?: string
 }
 
@@ -75,12 +83,10 @@ const clamp = (n: number, min: number, max: number) =>
 /** One full-screen background: the backdrop, slowly zooming, tinted toward a glow colour */
 function Backdrop({
   item,
-  grade,
   first,
   reduced,
 }: {
   item: FilmstripItem
-  grade: string
   first: boolean
   reduced: boolean
 }) {
@@ -118,15 +124,6 @@ function Backdrop({
         decoding='async'
         className='absolute inset-0 size-full object-cover will-change-transform'
       />
-      {/* keep the picture's light and dark, pull its colour a little toward the grade */}
-      <div
-        className='absolute inset-0 opacity-30 mix-blend-color'
-        style={{ backgroundColor: grade }}
-      />
-      <div
-        className='absolute inset-0 opacity-20 mix-blend-multiply'
-        style={{ backgroundColor: grade }}
-      />
     </div>
   )
 }
@@ -138,12 +135,38 @@ export function FilmstripHero({
   autoplay = true,
   autoplayDelay = 7000,
   actions,
+  atmosphere,
+  parallaxTrigger,
   className,
 }: FilmstripHeroProps) {
   const { reduced } = useMotion()
   const stageRef = useRef<HTMLElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
+  const copyRef = useRef<HTMLDivElement>(null)
+  const backdropsRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
+
+  // depth: backdrop slowest, strip faster, copy fastest (negative ratio = moves up while the page scrolls)
+  const noParallax = !parallaxTrigger
+  useParallax(backdropsRef, {
+    trigger: parallaxTrigger,
+    ratio: -0.04,
+    range: 'pin',
+    disabled: noParallax,
+  })
+  useParallax(stripRef, {
+    trigger: parallaxTrigger,
+    ratio: -0.12,
+    range: 'pin',
+    disabled: noParallax,
+  })
+  useParallax(copyRef, {
+    trigger: parallaxTrigger,
+    ratio: -0.2,
+    range: 'pin',
+    disabled: noParallax,
+  })
   const last = Math.max(0, items.length - 1)
 
   // sized from the window up front, so the first paint already has the real card sizes (no layout shift)
@@ -192,6 +215,15 @@ export function FilmstripHero({
     return () => ro.disconnect()
   }, [])
 
+  // fetch and decode the next backdrop ahead of time, so its cross-fade never waits on an image
+  useEffect(() => {
+    const next = items[(index + 1) % items.length]
+    if (!next || items.length < 2) return
+    const img = new Image()
+    img.src = next.backdrop
+    img.decode?.().catch(() => {})
+  }, [index, items])
+
   // drop the old backdrop once the new one has faded in
   useEffect(() => {
     if (previous === null) return
@@ -222,21 +254,36 @@ export function FilmstripHero({
     }
   }, [index, xFor, dragging, reduced])
 
-  // the new title wipes up from behind its own edge (not on first paint)
+  // each title's words rise from behind their own edge, one after another, then the rest of the copy
+  // follows. Runs on first load and on every change. (The backdrop, not the title, is the LCP element.)
   useLayoutEffect(() => {
     const title = titleRef.current
-    if (!title || index === firstIndex) return
-    const lines = title.querySelectorAll<HTMLElement>('[data-line]')
-    const wipe = reduced
-      ? animate(title, { opacity: [0, 1], duration: 250, ease: 'linear' })
-      : animate(lines, {
-          y: ['110%', '0%'],
-          duration: 650,
-          delay: stagger(70),
-          ease: 'out(4)',
-        })
+    const copy = copyRef.current
+    if (!title || !copy) return
+    const words = title.querySelectorAll<HTMLElement>('[data-word]')
+    const details = copy.querySelectorAll<HTMLElement>('[data-hero-detail]')
+    const animations = reduced
+      ? [
+          animate(title, { opacity: [0, 1], duration: 250, ease: 'linear' }),
+          animate(details, { opacity: [0, 1], duration: 250, ease: 'linear' }),
+        ]
+      : [
+          animate(words, {
+            y: ['110%', '0%'],
+            duration: 700,
+            delay: stagger(55, { start: index === firstIndex ? 150 : 0 }),
+            ease: 'out(4)',
+          }),
+          animate(details, {
+            opacity: [0, 1],
+            y: [14, 0],
+            duration: 600,
+            delay: stagger(70, { start: 260 + words.length * 55 }),
+            ease: 'out(3)',
+          }),
+        ]
     return () => {
-      wipe.revert()
+      for (const a of animations) a.revert()
     }
   }, [index, reduced, firstIndex])
 
@@ -409,15 +456,34 @@ export function FilmstripHero({
         className
       )}
     >
-      {layers.map((i) => (
-        <Backdrop
-          key={items[i].id}
-          item={items[i]}
-          grade={GRADES[i % GRADES.length]}
-          first={i === firstIndex && previous === null}
-          reduced={reduced}
-        />
-      ))}
+      {/* oversized top and bottom so the parallax drift never shows an edge */}
+      <div
+        ref={backdropsRef}
+        className='absolute inset-x-0 -top-[6%] -bottom-[6%]'
+      >
+        {layers.map((i) => (
+          <Backdrop
+            key={items[i].id}
+            item={items[i]}
+            first={i === firstIndex && previous === null}
+            reduced={reduced}
+          />
+        ))}
+      </div>
+
+      {/* one shared colour grade over whichever backdrops are showing: keeps the pictures' light and dark,
+          pulls their colour a little toward the glow. One blend layer, not one per backdrop (cross-fades
+          blending four full-screen layers at once dropped frames on integrated GPUs). */}
+      <div
+        aria-hidden='true'
+        className={cn(
+          'absolute inset-0 opacity-25 mix-blend-color',
+          !reduced && 'transition-[background-color] duration-700'
+        )}
+        style={{ backgroundColor: GRADES[index % GRADES.length] }}
+      />
+
+      {atmosphere}
 
       {/* legibility: under the navbar, behind the copy, and into the page below */}
       <div
@@ -431,41 +497,56 @@ export function FilmstripHero({
 
       {/* title block, sitting just above the strip */}
       <div
+        ref={copyRef}
         className='absolute inset-x-0 top-0 shell flex flex-col justify-end pb-[3svh]'
         style={{ height: `${STRIP_TOP * 100}%` }}
       >
         <div className='flex w-full flex-wrap items-end gap-x-12 gap-y-4'>
           <div className='max-w-3xl min-w-0' aria-live='polite'>
             {active.eyebrow && (
-              <p className='mb-4 text-eyebrow font-semibold text-foreground/80 uppercase'>
+              <p
+                data-hero-detail
+                className='mb-4 text-eyebrow font-semibold text-foreground/80 uppercase'
+              >
                 {active.eyebrow}
               </p>
             )}
             <h1
               key={active.id}
               ref={titleRef}
+              aria-label={active.title}
               className='font-display text-display-2 font-bold text-balance'
             >
-              <span className='block overflow-hidden pb-[0.06em]'>
-                <span data-line className='block'>
-                  {active.title}
+              {/* one mask per word, so each rises from behind its own edge */}
+              {active.title.split(' ').map((word, i, all) => (
+                <span key={i} aria-hidden='true'>
+                  <span className='inline-block overflow-hidden pb-[0.08em] align-bottom'>
+                    <span data-word className='inline-block'>
+                      {word}
+                    </span>
+                  </span>
+                  {i < all.length - 1 ? ' ' : null}
                 </span>
-              </span>
+              ))}
             </h1>
             {active.overview && (
               <p
                 key={`o-${active.id}`}
+                data-hero-detail
                 className='mt-4 line-clamp-2 max-w-xl text-base text-foreground/80 md:text-lg'
               >
                 {active.overview}
               </p>
             )}
             {actions && (
-              <div className='mt-6 flex flex-wrap gap-3'>{actions(active)}</div>
+              <div data-hero-detail className='mt-6 flex flex-wrap gap-3'>
+                {actions(active)}
+              </div>
             )}
           </div>
           {active.meta?.length ? (
             <ul
+              data-hero-detail
               className='ml-auto hidden items-end gap-8 md:flex'
               aria-label='Details'
             >
@@ -484,6 +565,7 @@ export function FilmstripHero({
 
       {/* the strip: one shared top edge, the focused card twice as tall */}
       <div
+        ref={stripRef}
         className='absolute inset-x-0'
         style={{ top: `${STRIP_TOP * 100}%`, height: fullH }}
       >
@@ -511,13 +593,18 @@ export function FilmstripHero({
                 onClick={() => {
                   if (!suppressClick.current) go(i)
                 }}
+                // every card is full height; the half-height look is a clip, so a focus change never
+                // re-lays out the strip (paint only), and the clipped half can't be clicked
                 className={cn(
-                  'relative shrink-0 overflow-hidden rounded-xl border bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  focused ? 'border-foreground/40' : 'border-border',
+                  'group relative shrink-0 rounded-xl bg-muted outline-none',
                   !reduced &&
-                    'transition-[height,border-color] duration-700 ease-out-expo'
+                    'transition-[clip-path] duration-700 ease-out-expo'
                 )}
-                style={{ width: cardW, height: focused ? fullH : halfH }}
+                style={{
+                  width: cardW,
+                  height: fullH,
+                  clipPath: `inset(0 0 ${focused ? 0 : fullH - halfH}px 0 round 12px)`,
+                }}
               >
                 <img
                   src={item.poster}
@@ -535,6 +622,17 @@ export function FilmstripHero({
                     !reduced && 'transition-opacity duration-700',
                     focused ? 'opacity-0' : 'opacity-35'
                   )}
+                />
+                {/* the frame (border + focus ring) follows the visible height; out of flow, so cheap */}
+                <span
+                  aria-hidden='true'
+                  className={cn(
+                    'pointer-events-none absolute inset-x-0 top-0 rounded-xl border group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-inset',
+                    focused ? 'border-foreground/40' : 'border-border',
+                    !reduced &&
+                      'transition-[height,border-color] duration-700 ease-out-expo'
+                  )}
+                  style={{ height: focused ? fullH : halfH }}
                 />
               </button>
             )

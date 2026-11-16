@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Lenis from 'lenis'
-import 'lenis/dist/lenis.css'
+import type Lenis from 'lenis'
 import { MotionContext, type MotionPreference } from './motion-context'
 
 const QUERY = '(prefers-reduced-motion: reduce)'
@@ -16,9 +15,10 @@ const readPreference = (): MotionPreference => {
 }
 
 /**
- * The one place smooth scrolling lives. Wrap stream pages in this (StreamLayout does).
- * - Lenis runs only when motion is not reduced, and is destroyed as soon as it becomes reduced.
- * - Sets html[data-motion="reduce" | "full"] so CSS can react too.
+ * Mounted once at the root of the app (main.tsx). Owns the motion preference and the app's single Lenis
+ * instance. It imports nothing heavy: the instance itself is created by useSmoothScroll() inside
+ * StreamLayout (lazy chunk), so lenis and anime.js stay out of the sign-in and admin bundles.
+ * Sets html[data-motion="reduce" | "full"] so CSS can react too.
  */
 export function MotionProvider({ children }: { children: React.ReactNode }) {
   const [systemReduced, setSystemReduced] = useState(
@@ -26,7 +26,7 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
   )
   const [preference, setPreferenceState] =
     useState<MotionPreference>(readPreference)
-  // a ref, not state: nothing renders differently because of the instance itself
+  const [lenis, setLenis] = useState<Lenis | null>(null)
   const lenisRef = useRef<Lenis | null>(null)
   const locks = useRef(0)
 
@@ -49,25 +49,6 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [reduced])
 
-  useEffect(() => {
-    if (reduced) return
-    const instance = new Lenis({
-      autoRaf: true,
-      lerp: 0.12,
-      anchors: true,
-      allowNestedScroll: true,
-      stopInertiaOnNavigate: true,
-    })
-    if (locks.current > 0) instance.stop()
-    lenisRef.current = instance
-    return () => {
-      instance.destroy()
-      lenisRef.current = null
-    }
-  }, [reduced])
-
-  const getLenis = useCallback(() => lenisRef.current, [])
-
   const setPreference = useCallback((next: MotionPreference) => {
     setPreferenceState(next)
     try {
@@ -77,6 +58,14 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
       // storage blocked: the choice still applies for this visit
     }
   }, [])
+
+  const attachLenis = useCallback((instance: Lenis | null) => {
+    lenisRef.current = instance
+    if (instance && locks.current > 0) instance.stop()
+    setLenis(instance)
+  }, [])
+
+  const getLenis = useCallback(() => lenisRef.current, [])
 
   const lockScroll = useCallback(() => {
     locks.current += 1
@@ -96,11 +85,22 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
       systemReduced,
       preference,
       setPreference,
-      smoothScroll: !reduced,
+      smoothScroll: lenis !== null,
+      lenis,
       getLenis,
+      attachLenis,
       lockScroll,
     }),
-    [reduced, systemReduced, preference, setPreference, getLenis, lockScroll]
+    [
+      reduced,
+      systemReduced,
+      preference,
+      setPreference,
+      lenis,
+      getLenis,
+      attachLenis,
+      lockScroll,
+    ]
   )
 
   return (

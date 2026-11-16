@@ -6,7 +6,7 @@ export const sidebarData: SidebarData = {
   navGroups: [
     {
       title: 'General',
-      items: [{ title: 'Dashboard', url: '/', icon: LayoutDashboard }],
+      items: [{ title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard }],
     },
     {
       title: 'Settings',

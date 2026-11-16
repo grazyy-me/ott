@@ -1,7 +1,6 @@
 import { useLayoutEffect } from 'react'
 import { LazyMotion } from 'framer-motion'
-import { MotionProvider } from '@/context/motion-provider'
-import { RouteTransition } from '@/components/motion'
+import { RouteTransition, useSmoothScroll } from '@/components/motion'
 import { SkipToMain } from '@/components/skip-to-main'
 import { Grain } from '@/components/stream/grain'
 import { StreamFooter } from '@/components/stream/stream-footer'
@@ -12,7 +11,8 @@ const loadFramerFeatures = () =>
 
 /**
  * Public shell for every stream page: dark stream tokens, smooth scroll, grain, floating nav, footer,
- * and cross-faded page changes. Lazy-loaded by the router, so the motion libraries stay out of the
+ * and cross-faded page changes. It starts the app's one Lenis loop (useSmoothScroll; the instance lives in
+ * the root MotionProvider). Lazy-loaded by the router, so the motion libraries stay out of the
  * sign-in and admin bundles.
  */
 export function StreamLayout() {
@@ -25,8 +25,10 @@ export function StreamLayout() {
     }
   }, [])
 
+  useSmoothScroll()
+
   return (
-    <MotionProvider>
+    <>
       <LazyMotion features={loadFramerFeatures} strict>
         <SkipToMain />
         <Grain />
@@ -36,6 +38,6 @@ export function StreamLayout() {
         </main>
         <StreamFooter />
       </LazyMotion>
-    </MotionProvider>
+    </>
   )
 }
