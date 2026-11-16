@@ -3,7 +3,8 @@
 //
 //   npm run seed:tmdb                                  ~300 movies, ~150 series, ~50 reality shows, 15 free titles
 //   npm run seed:tmdb -- --movies=20 --series=10 --reality=5 --free=3
-//   options: --movies --series --reality --free --concurrency=6 --max-seasons=10
+//   npm run seed:tmdb -- --movies=0 --series=0 --reality=0     only the regional batches (see REGIONS)
+//   options: --movies --series --reality --free --concurrency=6 --max-seasons=10 --regions=false
 //
 // Needs TMDB_API_KEY (v3) or TMDB_READ_TOKEN (v4) in .env. TMDB_BASE_URL overrides the API host (used by tests).
 import dns from 'node:dns';
@@ -44,6 +45,29 @@ const DEMO_STREAMS = [
   'https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8',
 ];
 
+// Regional batches on top of the global popularity lists, which come out almost entirely English-language.
+// Each region takes the most popular titles originally made in that language (TMDB `with_original_language`),
+// so the catalog has real variety for local audiences. Quotas are per region: [movies, series, reality].
+// Titles that are already in the catalog count towards the quota, so re-running adds nothing new.
+// Turn off with --regions=false.
+const REGIONS = [
+  { code: 'hi', name: 'India: Hindi', quota: [14, 8, 3] },
+  { code: 'ta', name: 'India: Tamil', quota: [8, 3, 0] },
+  { code: 'te', name: 'India: Telugu', quota: [8, 2, 0] },
+  { code: 'ml', name: 'India: Malayalam', quota: [6, 2, 0] },
+  { code: 'ko', name: 'Korea', quota: [12, 10, 3] },
+  { code: 'ja', name: 'Japan', quota: [12, 8, 2] },
+  { code: 'es', name: 'Spain and Latin America', quota: [10, 8, 2] },
+  { code: 'fr', name: 'France', quota: [8, 5, 1] },
+  { code: 'de', name: 'Germany', quota: [6, 5, 1] },
+  { code: 'it', name: 'Italy', quota: [5, 2, 0] },
+  { code: 'pt', name: 'Brazil and Portugal', quota: [6, 4, 2] },
+  { code: 'tr', name: 'Turkey', quota: [4, 6, 0] },
+  { code: 'zh', name: 'China', quota: [6, 4, 0] },
+  { code: 'th', name: 'Thailand', quota: [3, 3, 0] },
+];
+const REGION_SPARE = 2; // regional titles are skipped more often (no English overview), so look at twice as many
+
 // ---------------------------------------------------------------- TMDB client (rate-limit aware)
 
 const BASE = (process.env.TMDB_BASE_URL || 'https://api.themoviedb.org/3').replace(/\/$/, '');
@@ -55,7 +79,7 @@ const MAX_ATTEMPTS = 7;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let nextSlot = 0;
-const stats = { requests: 0, rateLimited: 0, retries: 0 };
+const stats = { requests: 0, rateLimited: 0, retries: 0, created: 0 };
 
 // Spaces out request starts across all concurrent workers; a 429 pushes the slot out for everyone
 const throttle = async () => {
@@ -229,9 +253,9 @@ async function upsertPeople(people) {
 /** Keep an existing title's slug (URLs must not change); otherwise title-year, made unique if it collides. */
 async function resolveSlug(tmdbType, tmdbId, title, year) {
   const existing = await Title.findOne({ tmdbType, tmdbId }).select('slug').lean();
-  if (existing) return existing.slug;
+  if (existing) return { slug: existing.slug, isNew: false };
   const base = slugify(title) ? `${slugify(title)}${year ? `-${year}` : ''}` : `title-${tmdbType}-${tmdbId}`;
-  return (await Title.exists({ slug: base })) ? `${base}-${tmdbType}-${tmdbId}` : base;
+  return { slug: (await Title.exists({ slug: base })) ? `${base}-${tmdbType}-${tmdbId}` : base, isNew: true };
 }
 
 async function importSeasons(titleDoc, tmdbId, d) {
@@ -350,7 +374,7 @@ async function importTitle(kind, id, genreIds) {
     tmdbSyncedAt: new Date(),
   };
 
-  const slug = await resolveSlug(kind, id, name, year);
+  const { slug, isNew } = await resolveSlug(kind, id, name, year);
   const upsertTitle = (slugToUse) =>
     withDupRetry(() =>
       Title.findOneAndUpdate(
@@ -378,6 +402,7 @@ async function importTitle(kind, id, genreIds) {
     if (err?.code === 11000 && /slug/.test(err.message)) titleDoc = await upsertTitle(`${slug}-${kind}-${id}`);
     else throw err;
   }
+  if (isNew) stats.created += 1;
 
   if (!isMovie) await importSeasons(titleDoc, id, d);
   return 'imported';
@@ -385,8 +410,9 @@ async function importTitle(kind, id, genreIds) {
 
 // ---------------------------------------------------------------- candidate lists
 
-async function collectIds(kind, target, params, fallbackParams) {
-  const wanted = Math.ceil(target * 1.2) + 5; // spare candidates: some get skipped (no poster / overview)
+async function collectIds(kind, target, params, fallbackParams, spare) {
+  // spare candidates: some get skipped (no poster, or no English overview, which is common for regional titles)
+  const wanted = Math.ceil(target * spare) + 5;
   const ids = [];
   const seen = new Set();
 
@@ -415,9 +441,9 @@ async function collectIds(kind, target, params, fallbackParams) {
   return ids;
 }
 
-async function importBatch(label, kind, target, params, fallbackParams, genreIds, summary) {
+async function importBatch(label, kind, target, params, fallbackParams, genreIds, summary, spare = 1.2) {
   if (target === 0) return;
-  const ids = await collectIds(kind, target, params, fallbackParams);
+  const ids = await collectIds(kind, target, params, fallbackParams, spare);
   const result = { imported: 0, skipped: 0, missing: 0, failed: 0 };
   let finished = 0;
   let inFlight = 0;
@@ -547,6 +573,44 @@ async function main() {
     summary
   );
 
+  if (args.regions !== 'false') {
+    console.log('Regions...');
+    for (const region of REGIONS) {
+      const lang = { with_original_language: region.code };
+      const [movies, series, reality] = region.quota;
+      await importBatch(
+        `${region.code} movies`,
+        'movie',
+        movies,
+        { ...lang, 'vote_count.gte': 100 },
+        { ...lang, 'vote_count.gte': 10 },
+        genreIds,
+        summary,
+        REGION_SPARE
+      );
+      await importBatch(
+        `${region.code} series`,
+        'tv',
+        series,
+        { ...lang, 'vote_count.gte': 50, without_genres: NOT_SERIES_GENRES },
+        { ...lang, 'vote_count.gte': 5, without_genres: NOT_SERIES_GENRES },
+        genreIds,
+        summary,
+        REGION_SPARE
+      );
+      await importBatch(
+        `${region.code} reality`,
+        'tv',
+        reality,
+        { ...lang, with_genres: REALITY_GENRE, 'vote_count.gte': 10 },
+        { ...lang, with_genres: REALITY_GENRE, 'vote_count.gte': 0 },
+        genreIds,
+        summary,
+        REGION_SPARE
+      );
+    }
+  }
+
   const freeMarked = FREE_TARGET > 0 ? await markFreeTitles() : 0;
 
   // report
@@ -564,7 +628,15 @@ async function main() {
   console.log(
     `  total    ${String(perType.reduce((n, r) => n + r.count, 0)).padStart(4)}   (free: ${free.reduce((n, r) => n + r.count, 0)}, newly marked this run: ${freeMarked})`
   );
+  console.log(`New titles added this run: ${stats.created}`);
   console.log(`Genres ${totals[0]}, people ${totals[1]}, seasons ${totals[2]}, episodes ${totals[3]}`);
+  const byCountry = await Title.aggregate([
+    { $unwind: '$countries' },
+    { $group: { _id: '$countries', count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+    { $limit: 12 },
+  ]);
+  console.log(`Top countries: ${byCountry.map((c) => `${c._id} ${c.count}`).join(', ')}`);
   console.log(
     `TMDB requests ${stats.requests}, rate-limited ${stats.rateLimited}, retried ${stats.retries}, took ${Math.round((Date.now() - startedAt) / 1000)}s`
   );

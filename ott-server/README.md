@@ -59,6 +59,7 @@ npm run seed:tmdb -- --movies=20 --series=10 --reality=5 --free=3   # a small te
 ```
 
 - Safe to re-run: everything is upserted by TMDB id and type. `slug`, `isFree`, `videoUrl`, `isPublished` and `viewCount` are never overwritten, so admin edits survive a re-sync.
+- After the global popularity lists it adds regional batches (the `REGIONS` list in the script): Hindi, Tamil, Telugu, Malayalam, Korean, Japanese, Spanish, French, German, Italian, Portuguese, Turkish, Chinese and Thai titles, picked by original language. Skip them with `--regions=false`, or run only them with `--movies=0 --series=0 --reality=0`.
 - Reality shows are TMDB TV titles in genre 10764. Talk shows, news and soaps are left out of "series".
 - Requests are spaced to stay under TMDB's limit, and a 429 pauses all workers for the `Retry-After` time.
 - Series and reality shows import seasons 1 to 10 (`--max-seasons`) with their episodes; "Specials" are skipped.
