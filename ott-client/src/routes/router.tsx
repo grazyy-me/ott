@@ -149,6 +149,28 @@ export const router = createBrowserRouter([
               return { Component: () => <BrowsePage type={type} /> }
             },
           })),
+          // a title as a full page (direct link, reload); from a card it opens as a modal (StreamLayout)
+          {
+            path: '/title/:slug',
+            lazy: async () => ({
+              Component: (await import('@/features/title/title-page'))
+                .TitlePage,
+            }),
+          },
+          // the player (playback phase); for now a placeholder. Playing needs an account.
+          {
+            element: <ProtectedRoute />,
+            children: ['/watch/:slug', '/watch/:slug/:episodeId'].map(
+              (path) => ({
+                path,
+                lazy: async () => ({
+                  Component: (
+                    await import('@/features/watch/watch-placeholder')
+                  ).WatchPlaceholder,
+                }),
+              })
+            ),
+          },
           {
             path: '/browse/:key',
             lazy: async () => ({

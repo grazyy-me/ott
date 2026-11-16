@@ -1,7 +1,8 @@
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { Provider } from 'react-redux'
-import { RouterProvider } from 'react-router'
+// react-router/dom's RouterProvider renders view transitions with flushSync (the card-to-modal morph)
+import { RouterProvider } from 'react-router/dom'
 import { store } from './app/store'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'

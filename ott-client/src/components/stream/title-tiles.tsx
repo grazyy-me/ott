@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router'
 import type { RailItem } from '@/types/catalog'
+import { lengthLabel } from '@/lib/title-format'
 import { tmdbImage } from '@/lib/tmdb-image'
 import { cn } from '@/lib/utils'
-
-const titleHref = (t: Pick<RailItem, 'slug'>) => `/title/${t.slug}`
+import { TitleLink } from './title-link'
 
 const metaLine = (t: RailItem) =>
   [t.year, t.rating ? `${t.rating.toFixed(1)} ★` : null, t.genres[0]?.name]
@@ -45,14 +44,11 @@ export function PosterTile({
   className?: string
 }) {
   return (
-    <Link
-      to={titleHref(t)}
-      className={cn(
-        'group block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        className
-      )}
-    >
-      <div className='relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-muted'>
+    <TitleLink title={t} className={cn('group block rounded-xl', className)}>
+      <div
+        data-title-media
+        className='relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-muted'
+      >
         {t.posterUrl && (
           <img
             src={tmdbImage(t.posterUrl, 'w342')}
@@ -70,7 +66,7 @@ export function PosterTile({
         {t.title}
       </p>
       <p className='truncate text-xs text-muted-foreground'>{metaLine(t)}</p>
-    </Link>
+    </TitleLink>
   )
 }
 
@@ -87,14 +83,11 @@ export function LandscapeTile({
   const progress = t.progress
   const episode = progress?.episode
   return (
-    <Link
-      to={titleHref(t)}
-      className={cn(
-        'group block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        className
-      )}
-    >
-      <div className='relative aspect-video overflow-hidden rounded-2xl border border-border bg-muted'>
+    <TitleLink title={t} className={cn('group block rounded-2xl', className)}>
+      <div
+        data-title-media
+        className='relative aspect-video overflow-hidden rounded-2xl border border-border bg-muted'
+      >
         {t.backdropUrl && (
           <img
             src={tmdbImage(t.backdropUrl, 'w780')}
@@ -129,7 +122,7 @@ export function LandscapeTile({
               ? timeLeft(progress)
               : [
                   t.year,
-                  t.numberOfSeasons ? `${t.numberOfSeasons} seasons` : null,
+                  t.type === 'movie' ? null : lengthLabel(t),
                   t.rating ? `${t.rating.toFixed(1)} ★` : null,
                 ]
                   .filter(Boolean)
@@ -152,6 +145,6 @@ export function LandscapeTile({
           </div>
         )}
       </div>
-    </Link>
+    </TitleLink>
   )
 }

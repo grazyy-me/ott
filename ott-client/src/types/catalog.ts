@@ -111,8 +111,16 @@ export interface TitleDetail extends TitleCard {
   /** Top-billed cast, in billing order */
   cast: CastMember[]
   crew: CrewMember[]
-  /** Directors, or creators for series */
+  /** Directors, or creators for series (kept for older code; prefer the three lists below) */
   director: Credit[]
+  directors: Credit[]
+  creators: Credit[]
+  /** Screenplay, writer and story credits, each person once */
+  writers: Credit[]
+  /** On the signed-in user's My List (false signed out) */
+  inList: boolean
+  /** e.g. "Oscar · Best Picture (1973)"; empty for most titles */
+  awards: string[]
   /** Empty for movies; season 0 ("Specials") is not imported */
   seasons: Season[]
 }

@@ -1,7 +1,7 @@
-import { Link } from 'react-router'
 import type { TitleCard } from '@/types/catalog'
 import { tmdbImage } from '@/lib/tmdb-image'
 import { Stagger } from '@/components/motion'
+import { TitleLink } from './title-link'
 
 /**
  * Top 10: posters standing in front of giant outlined rank numerals. A sideways rail with snap,
@@ -28,17 +28,17 @@ export function TopTenRail({
     >
       {top.map((t, i) => (
         <li key={t.id} className='shrink-0 snap-start'>
-          <Link
-            to={`/title/${t.slug}`}
-            className='group flex items-end rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring'
-          >
+          <TitleLink title={t} className='group flex items-end rounded-xl'>
             <span
               aria-hidden='true'
               className='-mr-3 font-display text-[clamp(8.5rem,15vw,13.5rem)] leading-[0.74] font-extrabold tracking-tighter text-transparent select-none [-webkit-text-stroke:3px_color-mix(in_oklch,var(--foreground)_60%,transparent)] sm:-mr-4'
             >
               {i + 1}
             </span>
-            <div className='relative w-32 overflow-hidden rounded-xl border border-border bg-muted shadow-[0_18px_40px_-18px_oklch(0_0_0/80%)] sm:w-40 lg:w-44'>
+            <div
+              data-title-media
+              className='relative w-32 overflow-hidden rounded-xl border border-border bg-muted shadow-[0_18px_40px_-18px_oklch(0_0_0/80%)] sm:w-40 lg:w-44'
+            >
               <div className='aspect-[2/3]'>
                 <img
                   src={tmdbImage(t.posterUrl, 'w342')}
@@ -51,7 +51,7 @@ export function TopTenRail({
                 />
               </div>
             </div>
-          </Link>
+          </TitleLink>
         </li>
       ))}
     </Stagger>

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import type { BrowseFilters, TitleType } from '@/types/catalog'
+import { countryName, languageName } from '@/lib/locale-names'
 import { cn } from '@/lib/utils'
 import {
   useGetFacetsQuery,
@@ -17,15 +18,6 @@ const SORTS: { value: NonNullable<BrowseFilters['sort']>; label: string }[] = [
 ]
 
 /** The FilterBar's state, read from the URL query (the single source of truth) */
-const regionNames = new Intl.DisplayNames(['en'], { type: 'region' })
-const languageNames = new Intl.DisplayNames(['en'], { type: 'language' })
-const safeName = (names: Intl.DisplayNames, code: string) => {
-  try {
-    return names.of(code) ?? code
-  } catch {
-    return code
-  }
-}
 
 /**
  * Country, Language, Genre and Year dropdowns plus a sort switch, all mirrored in the URL query, so a
@@ -51,14 +43,14 @@ export function FilterBar({
     const countries: GlassSelectOption[] = (f?.countries ?? [])
       .map((c) => ({
         value: c.code,
-        label: safeName(regionNames, c.code),
+        label: countryName(c.code),
         hint: String(c.count),
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
     const languages: GlassSelectOption[] = (f?.languages ?? [])
       .map((l) => ({
         value: l.code,
-        label: safeName(languageNames, l.code),
+        label: languageName(l.code),
         hint: String(l.count),
       }))
       .sort((a, b) => a.label.localeCompare(b.label))

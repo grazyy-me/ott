@@ -1,5 +1,11 @@
-import { useState } from 'react'
-import { useLocation, useOutlet } from 'react-router'
+import { useState, type ReactNode } from 'react'
+import {
+  UNSAFE_LocationContext as LocationContext,
+  useLocation,
+  useNavigationType,
+  useOutlet,
+  type Location,
+} from 'react-router'
 import { AnimatePresence, m } from 'framer-motion'
 import { useMotion } from './use-motion'
 
@@ -12,13 +18,36 @@ function FrozenOutlet() {
   return frozen
 }
 
+/** Makes the page underneath a modal read its own location (search params and all), not the modal's URL */
+function AtLocation({
+  location,
+  children,
+}: {
+  location?: Location
+  children: ReactNode
+}) {
+  const navigationType = useNavigationType()
+  const current = useLocation()
+  // always the same element type: switching between a provider and bare children would remount the page
+  return (
+    <LocationContext.Provider
+      value={{ location: location ?? current, navigationType }}
+    >
+      {children}
+    </LocationContext.Provider>
+  )
+}
+
 /**
  * Cross-fades between stream pages (framer-motion: route and modal transitions only, per CLAUDE.md).
  * Needs a <LazyMotion> ancestor (StreamLayout provides it).
+ * `pageLocation`: while a title modal is open, the page it was opened from; that page stays mounted and
+ * still (no transition) underneath.
  * Reduced motion: a short opacity fade, no movement.
  */
-export function RouteTransition() {
-  const location = useLocation()
+export function RouteTransition({ pageLocation }: { pageLocation?: Location }) {
+  const current = useLocation()
+  const location = pageLocation ?? current
   const { reduced } = useMotion()
 
   return (
@@ -37,7 +66,9 @@ export function RouteTransition() {
           transition: { duration: reduced ? 0.1 : 0.22, ease: 'easeIn' },
         }}
       >
-        <FrozenOutlet />
+        <AtLocation location={pageLocation}>
+          <FrozenOutlet />
+        </AtLocation>
       </m.div>
     </AnimatePresence>
   )

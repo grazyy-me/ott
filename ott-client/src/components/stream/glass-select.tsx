@@ -31,8 +31,8 @@ type GlassSelectProps = {
   value?: string
   options: GlassSelectOption[]
   onChange: (value: string | undefined) => void
-  /** Text for the "no filter" row */
-  anyLabel?: string
+  /** Text for the "no filter" row; null leaves the row out (a value is always set) */
+  anyLabel?: string | null
   className?: string
 }
 
@@ -89,17 +89,19 @@ export function GlassSelect({
           )}
           <CommandList data-lenis-prevent className='max-h-72'>
             <CommandEmpty>No match.</CommandEmpty>
-            <CommandItem
-              value={`__any ${anyLabel}`}
-              onSelect={() => {
-                onChange(undefined)
-                setOpen(false)
-              }}
-              className='rounded-lg'
-            >
-              <span className='flex-1 text-muted-foreground'>{anyLabel}</span>
-              {!selected && <Check aria-hidden='true' className='size-4' />}
-            </CommandItem>
+            {anyLabel !== null && (
+              <CommandItem
+                value={`__any ${anyLabel}`}
+                onSelect={() => {
+                  onChange(undefined)
+                  setOpen(false)
+                }}
+                className='rounded-lg'
+              >
+                <span className='flex-1 text-muted-foreground'>{anyLabel}</span>
+                {!selected && <Check aria-hidden='true' className='size-4' />}
+              </CommandItem>
+            )}
             {options.map((o) => (
               <CommandItem
                 key={o.value}

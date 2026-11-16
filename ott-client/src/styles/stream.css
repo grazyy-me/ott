@@ -119,11 +119,10 @@ html[data-surface='stream'] {
 }
 
 /* Page gutter + max width for stream pages */
+/* The page gutter: sections run edge to edge at any width, with breathing room at the sides */
 @utility shell {
-  margin-inline: auto;
   width: 100%;
-  max-width: 88rem;
-  padding-inline: clamp(1.25rem, 4vw, 3rem);
+  padding-inline: clamp(1.25rem, 4vw, 4rem);
 }
 
 @utility scrim-bottom {
@@ -163,4 +162,41 @@ html[data-surface='stream'].lenis {
 
 html[data-motion='reduce'] .skeleton {
   animation: none;
+}
+
+/* Hover preview without a trailer: a slow push-in on the backdrop (not used with reduced motion) */
+@utility animate-ken-burns {
+  animation: ken-burns 9s var(--ease-out-expo) forwards;
+}
+
+@keyframes ken-burns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.12) translate3d(-2%, -1%, 0);
+  }
+}
+
+/*
+ * Card-to-modal morph (View Transitions): the card's picture and the modal's backdrop share the name
+ * `title-media`; both snapshots keep covering the box while it grows, instead of stretching.
+ */
+::view-transition-group(title-media) {
+  animation-duration: 0.5s;
+  animation-timing-function: var(--ease-out-expo);
+  overflow: hidden;
+  border-radius: 1.5rem;
+}
+
+::view-transition-old(title-media),
+::view-transition-new(title-media) {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.3s;
 }

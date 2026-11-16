@@ -1,5 +1,5 @@
 export type TmdbImageSize =
-  'w185' | 'w342' | 'w500' | 'w780' | 'w1280' | 'original'
+  'w185' | 'w300' | 'w342' | 'w500' | 'w780' | 'w1280' | 'original'
 
 /**
  * Re-sizes a stored TMDB image URL (the seed stores posters at w780 and backdrops at w1280).
