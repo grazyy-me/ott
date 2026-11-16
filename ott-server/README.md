@@ -47,11 +47,15 @@ All routes are under `/v1`. Success responses are `{ statusCode, data, message, 
 | GET | `/genres` | | Genres with title counts; `?type=` counts within one type |
 | GET | `/search?q=` | | Substring match on title; `q` needs 2+ characters. Also `type`, `page`, `limit` |
 | GET | `/titles/facets` | | FilterBar options: `{ countries: [{ code, count }], languages: [{ code, count }], years: { min, max } }`; `?type=` narrows to one type |
-| GET | `/rails?page=` | optional Bearer | Every rail of a page (`home`, `movie`, `series` or `reality`), up to 16 titles each, as `{ rails: [{ key, title, total, items, source? }] }`. Empty rails are left out; Continue Watching and Because You Watched only appear signed in |
+| GET | `/rails?page=` | optional Bearer | Every rail of a page (`home`, `movie`, `series` or `reality`), up to 16 titles each, as `{ rails: [{ key, title, total, items, source? }] }`. Empty rails are left out; Continue Watching and Because You Watched only appear signed in. Shared rails are cached 5 minutes, personal ones 2 minutes (cleared when progress changes) |
+| GET | `/recommendations/home` | optional Bearer | Home's ready-made rails, same shape and caching as `/rails?page=home` |
 | GET | `/rails/:key/titles` | optional Bearer | One rail's titles, paged (the "Show all" grid). Query: `type`, the FilterBar's `country`, `language`, `genre`, `year`, `sort` (latest\|popular\|rating, overrides the rail's own), `page`, `limit` (max 48). `key` `all` is every published title. Personal rails return 401 signed out |
-| GET | `/me/continue-watching` | Bearer | In-progress titles (not finished, newest first), each with `progress { positionSec, durationSec, percent, updatedAt, episode }`. `?type=`, `page`, `limit` |
-| PUT | `/me/progress` | Bearer | `{ titleId, episodeId?, positionSec, durationSec }`. Past 92% the item counts as finished and leaves Continue Watching |
-| DELETE | `/me/progress/:titleId` | Bearer | Removes a title from Continue Watching |
+| GET | `/me/continue-watching` | Bearer | Unfinished titles, last watched first, each with `progress { positionSec, durationSec, percent, updatedAt, episode, upNext }`. A series whose last episode was finished shows its next episode (`upNext`, 0%). `?type=`, `page`, `limit` |
+| PUT | `/me/progress` | Bearer | `{ titleId, episodeId?, positionSec, durationSec }`. Past 95% the item counts as finished. Saving brings a removed title back |
+| DELETE | `/me/progress/:titleId` | Bearer | Removes a title from Continue Watching (hidden; its history and resume points stay) |
+| POST | `/me/progress/:titleId/restore` | Bearer | Undo for the removal, without changing the row order |
+| POST | `/playback/:titleId` | Bearer | `{ episodeId? }` → `{ src, expiresAt, resumeAt, title, episode, next }`. For a series without `episodeId`: the episode in progress, else the one after the last finished, else S1E1. `resumeAt` is 0 under 30 s or past 95%. 403 when the title has no video yet; until billing exists any signed-in user may play |
+| POST | `/playback/:titleId/view` | Bearer | `{ episodeId? }`. Logs one view per viewing session (repeats within 30 minutes are ignored) and adds 1 to `viewCount`. Feeds Most Watched and Trending |
 | GET | `/me/watchlist` | Bearer | My List as title cards, newest first, each with `addedAt`. `page`, `limit` (max 48) |
 | GET | `/me/watchlist/ids` | Bearer | `{ ids }`: every title id on My List, so cards can show "added" without a request each |
 | PUT | `/me/watchlist/:titleId` | Bearer | Adds a title (204; adding twice is fine). 404 for an unknown or unpublished title |
@@ -64,9 +68,11 @@ next to it. A rail is a set of filters plus a sort:
 
 | Key | Rows | Rule |
 | --- | --- | --- |
-| `continue-watching` | all pages | Signed in: unfinished progress, newest first |
-| `trending`, `latest`, `most-watched` | all pages | Released titles by TMDB popularity / release date / view count |
-| `because-you-watched` | home | Signed in: shares genres with the last title watched, watched titles excluded |
+| `continue-watching` | all pages | Signed in: unfinished titles, last watched first (next episode for a finished one) |
+| `trending` | all pages | Views in the last 14 days, each worth half as much every 3 days; TMDB popularity fills the rest |
+| `latest` | all pages | Released titles, newest first |
+| `most-watched` | all pages | Views in the last 30 days; TMDB popularity fills the rest |
+| `because-you-watched`, `because-you-watched-2` | home, movie, series | Signed in: the last two titles watched. Other titles of the same type scored by shared genres (3 each), same director or creator (5), shared top-10 cast (2 each), same language (1.5), plus a small rating and popularity tie-break. Finished titles excluded |
 | `top-rated` | all pages | By rating, with a vote floor of 1,000 for movies and series and 50 for reality |
 | `award-winners` | home, movie, series | Titles with `awards` (curated Oscar / Emmy list in the seed) |
 | `free` | all pages | `isFree` |

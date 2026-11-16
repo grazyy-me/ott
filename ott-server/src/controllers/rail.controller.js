@@ -9,6 +9,12 @@ export const listRails = catchAsync(async (req, res) => {
   res.json(new ApiResponse(httpStatus.OK, { page: req.query.page, rails }));
 });
 
+/** GET /recommendations/home: the same rails as GET /rails?page=home (shared rails cached 5 min, personal 2 min) */
+export const homeRecommendations = catchAsync(async (req, res) => {
+  const rails = await railService.railsForPage('home', req.user);
+  res.json(new ApiResponse(httpStatus.OK, { page: 'home', rails }));
+});
+
 export const railTitles = catchAsync(async (req, res) => {
   const { type, page, limit, ...filters } = req.query;
   const result = await railService.railTitles(req.params.key, { user: req.user, type, filters, page, limit });
@@ -30,5 +36,10 @@ export const saveProgress = catchAsync(async (req, res) => {
 
 export const removeProgress = catchAsync(async (req, res) => {
   await railService.removeProgress(req.user, req.params.titleId);
+  res.status(httpStatus.NO_CONTENT).send();
+});
+
+export const restoreProgress = catchAsync(async (req, res) => {
+  await railService.restoreProgress(req.user, req.params.titleId);
   res.status(httpStatus.NO_CONTENT).send();
 });

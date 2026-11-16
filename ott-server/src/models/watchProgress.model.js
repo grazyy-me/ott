@@ -8,7 +8,9 @@ const watchProgressSchema = new mongoose.Schema(
     episode: { type: mongoose.Schema.Types.ObjectId, ref: 'Episode', default: null }, // null for movies
     positionSec: { type: Number, default: 0, min: 0 },
     durationSec: { type: Number, default: 0, min: 0 },
-    completed: { type: Boolean, default: false }, // set once past 92% of the duration
+    completed: { type: Boolean, default: false }, // set once past 95% of the duration
+    // "Remove from Continue Watching": hidden from the row, history kept; watching again clears it
+    dismissed: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

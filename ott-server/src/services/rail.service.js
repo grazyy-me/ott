@@ -1,8 +1,17 @@
 import httpStatus from 'http-status';
 import mongoose from 'mongoose';
 import ApiError from '../utils/ApiError.js';
-import { Title, WatchProgress } from '../models/index.js';
+import { Episode, Title, WatchProgress } from '../models/index.js';
 import { CARD_FIELDS, SORTS, buildTitleFilter, emptyPage, findTitlesPage, paged } from './catalog.service.js';
+import {
+  GLOBAL_TTL,
+  PERSONAL_TTL,
+  becauseYouWatched,
+  cache,
+  rankedTitlesPage,
+  recentSources,
+  viewRanking,
+} from './recommendation.service.js';
 
 /*
  * The rail registry. Each rail is a named query; each page is an ordered list of rail keys.
@@ -13,10 +22,17 @@ import { CARD_FIELDS, SORTS, buildTitleFilter, emptyPage, findTitlesPage, paged 
  */
 export const RAILS = {
   'continue-watching': { title: 'Continue Watching', personal: true },
-  trending: { title: 'Trending Now', query: { sort: 'trending', release: 'released' } },
+  // ranked by recent views (time-decayed) and by views in the last 30 days; TMDB popularity fills the rest
+  trending: { title: 'Trending Now', query: { sort: 'trending', release: 'released' }, ranking: 'trending' },
   latest: { title: 'Latest Releases', query: { sort: 'latest', release: 'released' } },
-  'most-watched': { title: 'Most Watched', query: { sort: 'popular', release: 'released' } },
-  'because-you-watched': { title: 'Because You Watched', personal: true },
+  'most-watched': {
+    title: 'Most Watched',
+    query: { sort: 'trending', release: 'released' },
+    ranking: 'most-watched',
+  },
+  // the user's last and second-to-last watched titles
+  'because-you-watched': { title: 'Because You Watched', personal: true, source: 0 },
+  'because-you-watched-2': { title: 'Because You Watched', personal: true, source: 1 },
   'top-rated': {
     title: 'Top Rated',
     // a 9.6 from 400 votes shouldn't outrank Breaking Bad
@@ -71,6 +87,7 @@ export const PAGES = {
     'latest',
     'most-watched',
     'because-you-watched',
+    'because-you-watched-2',
     'top-rated',
     'award-winners',
     'free',
@@ -84,6 +101,7 @@ export const PAGES = {
     'latest',
     'most-watched',
     'because-you-watched',
+    'because-you-watched-2',
     'top-rated',
     'award-winners',
     'free',
@@ -96,6 +114,7 @@ export const PAGES = {
     'latest',
     'most-watched',
     'because-you-watched',
+    'because-you-watched-2',
     'top-rated',
     'award-winners',
     'binge-worthy',
@@ -121,102 +140,91 @@ const toObjectId = (id) => new mongoose.Types.ObjectId(String(id));
 
 // ---------------------------------------------------------------- personal rails
 
-/** Titles the user is part-way through, most recent first, each with its progress (and episode for series) */
+/** The episode after `episode`: next in its season, else the first of the next season */
+export const nextEpisodeOf = (titleId, episode) =>
+  Episode.findOne({
+    title: titleId,
+    $or: [
+      { seasonNumber: episode.seasonNumber, episodeNumber: { $gt: episode.episodeNumber } },
+      { seasonNumber: { $gt: episode.seasonNumber } },
+    ],
+  }).sort({ seasonNumber: 1, episodeNumber: 1 });
+
+const episodeInfo = (e) =>
+  e ? { id: String(e._id), seasonNumber: e.seasonNumber, episodeNumber: e.episodeNumber, name: e.name } : null;
+
+/**
+ * Continue Watching: unfinished titles, most recently watched first. A movie or episode in progress shows its
+ * progress; a series whose last episode was finished shows the next one (`upNext`, 0%) while there is one.
+ * Rows the user removed (dismissed) are left out until they watch the title again.
+ */
 export const continueWatching = async (user, { type, page = 1, limit = RAIL_SIZE } = {}) => {
-  const [result] = await WatchProgress.aggregate([
-    { $match: { user: toObjectId(user.id), completed: false, positionSec: { $gt: 0 } } },
+  const latest = await WatchProgress.aggregate([
+    { $match: { user: toObjectId(user.id), dismissed: { $ne: true } } },
     { $sort: { updatedAt: -1 } },
     // one entry per title: the latest progress (for a series, the latest episode)
     { $group: { _id: '$title', progress: { $first: '$$ROOT' } } },
-    {
-      $lookup: {
-        from: 'titles',
-        localField: '_id',
-        foreignField: '_id',
-        as: 'title',
-        pipeline: [{ $project: { type: 1, isPublished: 1 } }],
-      },
-    },
-    { $unwind: '$title' },
-    { $match: { 'title.isPublished': true, ...(type ? { 'title.type': type } : {}) } },
     { $sort: { 'progress.updatedAt': -1 } },
-    { $facet: { rows: [{ $skip: (page - 1) * limit }, { $limit: limit }], total: [{ $count: 'n' }] } },
+    { $limit: 200 },
   ]);
-  const rows = result.rows;
-  const titles = await Title.find({ _id: { $in: rows.map((r) => r._id) } })
+
+  const titles = await Title.find({
+    _id: { $in: latest.map((r) => r._id) },
+    isPublished: true,
+    ...(type ? { type } : {}),
+  })
     .select(CARD_FIELDS)
     .populate('genres', 'name slug');
-  const episodes = await mongoose
-    .model('Episode')
-    .find({ _id: { $in: rows.map((r) => r.progress.episode).filter(Boolean) } })
+  const byId = new Map(titles.map((t) => [t.id, t]));
+  const episodes = await Episode.find({ _id: { $in: latest.map((r) => r.progress.episode).filter(Boolean) } })
     .select('seasonNumber episodeNumber name')
     .lean();
-  const byId = new Map(titles.map((t) => [t.id, t]));
   const episodeById = new Map(episodes.map((e) => [String(e._id), e]));
 
-  const items = rows
-    .map(({ _id, progress }) => {
-      const title = byId.get(String(_id));
-      if (!title) return null;
-      const episode = progress.episode ? episodeById.get(String(progress.episode)) : null;
-      return {
-        ...title.toJSON(),
-        progress: {
-          positionSec: progress.positionSec,
-          durationSec: progress.durationSec,
-          percent: progress.durationSec
-            ? Math.min(100, Math.round((progress.positionSec / progress.durationSec) * 100))
-            : 0,
-          updatedAt: progress.updatedAt,
-          episode: episode
-            ? {
-                id: String(episode._id),
-                seasonNumber: episode.seasonNumber,
-                episodeNumber: episode.episodeNumber,
-                name: episode.name,
-              }
-            : null,
-        },
-      };
-    })
-    .filter(Boolean);
-  return paged(items, page, limit, result.total[0]?.n ?? 0);
-};
+  const rows = (
+    await Promise.all(
+      latest.map(async ({ _id, progress }) => {
+        const title = byId.get(String(_id));
+        if (!title) return null;
+        const episode = progress.episode ? episodeById.get(String(progress.episode)) : null;
+        if (!progress.completed) {
+          if (progress.positionSec <= 0) return null;
+          return {
+            title,
+            progress: {
+              positionSec: progress.positionSec,
+              durationSec: progress.durationSec,
+              percent: progress.durationSec
+                ? Math.min(100, Math.round((progress.positionSec / progress.durationSec) * 100))
+                : 0,
+              updatedAt: progress.updatedAt,
+              episode: episodeInfo(episode),
+              upNext: false,
+            },
+          };
+        }
+        // finished: a movie is done; a series moves on to its next episode, if any
+        if (!episode) return null;
+        const next = await nextEpisodeOf(_id, episode);
+        if (!next) return null;
+        return {
+          title,
+          progress: {
+            positionSec: 0,
+            durationSec: (next.runtime ?? 0) * 60,
+            percent: 0,
+            updatedAt: progress.updatedAt,
+            episode: episodeInfo(next),
+            upNext: true,
+          },
+        };
+      })
+    )
+  ).filter(Boolean);
 
-/** "Because you watched X": titles sharing the most genres with the user's most recent title, minus what they've seen */
-export const becauseYouWatched = async (user, { type, page = 1, limit = RAIL_SIZE } = {}) => {
-  const history = await WatchProgress.find({ user: user.id }).sort({ updatedAt: -1 }).select('title').limit(200).lean();
-  if (!history.length) return { source: null, ...emptyPage(page, limit) };
-
-  const watchedIds = [...new Set(history.map((h) => String(h.title)))].map(toObjectId);
-  const sourceFilter = { _id: { $in: watchedIds }, isPublished: true, ...(type ? { type } : {}) };
-  // the most recent watched title of this page's type
-  const candidates = await Title.find(sourceFilter).select('title slug type genres').lean();
-  const order = new Map(watchedIds.map((id, i) => [String(id), i]));
-  const source = candidates.sort((a, b) => order.get(String(a._id)) - order.get(String(b._id)))[0];
-  if (!source || !source.genres.length) return { source: null, ...emptyPage(page, limit) };
-
-  const match = { _id: { $nin: watchedIds }, type: source.type, isPublished: true, genres: { $in: source.genres } };
-  const [result] = await Title.aggregate([
-    { $match: match },
-    { $addFields: { shared: { $size: { $setIntersection: ['$genres', source.genres] } } } },
-    { $sort: { shared: -1, popularity: -1, _id: 1 } },
-    {
-      $facet: {
-        ids: [{ $skip: (page - 1) * limit }, { $limit: limit }, { $project: { _id: 1 } }],
-        total: [{ $count: 'n' }],
-      },
-    },
-  ]);
-  const ids = result.ids.map((r) => r._id);
-  const docs = await Title.find({ _id: { $in: ids } })
-    .select(CARD_FIELDS)
-    .populate('genres', 'name slug');
-  const byId = new Map(docs.map((d) => [d.id, d]));
-  return {
-    source: { id: String(source._id), title: source.title, slug: source.slug },
-    ...paged(ids.map((id) => byId.get(String(id))).filter(Boolean), page, limit, result.total[0]?.n ?? 0),
-  };
+  const start = (page - 1) * limit;
+  const items = rows.slice(start, start + limit).map(({ title, progress }) => ({ ...title.toJSON(), progress }));
+  return paged(items, page, limit, rows.length);
 };
 
 // ---------------------------------------------------------------- resolution
@@ -233,8 +241,14 @@ export const railTitles = async (key, { user, type, filters = {}, page = 1, limi
   if (rail.personal) {
     if (!user) throw new ApiError(httpStatus.UNAUTHORIZED, 'Sign in to see this rail');
     if (key === 'continue-watching') return { ...meta, ...(await continueWatching(user, { type, page, limit })) };
-    const result = await becauseYouWatched(user, { type, page, limit });
-    return { ...meta, title: result.source ? `Because You Watched ${result.source.title}` : rail.title, ...result };
+    const source = (await recentSources(user, type))[rail.source];
+    if (!source) return { ...meta, source: null, ...emptyPage(page, limit) };
+    return {
+      ...meta,
+      title: `Because You Watched ${source.title}`,
+      source: { id: String(source._id), title: source.title, slug: source.slug },
+      ...(await becauseYouWatched(user, source, { page, limit })),
+    };
   }
 
   // a rail fixed to one type (Binge-worthy = series) is empty on another type's page
@@ -243,45 +257,89 @@ export const railTitles = async (key, { user, type, filters = {}, page = 1, limi
   const sort = filters.sort ?? rail.query.sort;
   const filter = await buildTitleFilter({ ...params, sort });
   if (!filter) return { ...meta, ...emptyPage(page, limit) };
+  // view-ranked rails keep their ranking unless the FilterBar asks for another sort
+  if (rail.ranking && !filters.sort) {
+    const ranked = await viewRanking(rail.ranking);
+    return { ...meta, ...(await rankedTitlesPage(ranked, filter, SORTS[sort], page, limit)) };
+  }
   return { ...meta, ...(await findTitlesPage(filter, SORTS[sort], page, limit)) };
 };
 
-/** GET /rails?page=: every rail of a page, first 16 titles each; empty rails are left out */
-export const railsForPage = async (pageKey, user) => {
+const toRail = (key, result) => ({
+  key,
+  title: result.title,
+  source: result.source ?? null,
+  items: result.results,
+  total: result.totalResults,
+});
+
+const loadRails = (keys, pageKey, user) => {
   const type = pageKey === 'home' ? undefined : pageKey;
-  const keys = PAGES[pageKey].filter((key) => !RAILS[key].personal || user);
-  const rails = await Promise.all(
-    keys.map(async (key) => {
-      const result = await railTitles(key, { user, type, limit: RAIL_SIZE });
-      return {
-        key,
-        title: result.title,
-        source: result.source ?? null,
-        items: result.results,
-        total: result.totalResults,
-      };
-    })
-  );
-  return rails.filter((rail) => rail.items.length > 0);
+  return Promise.all(keys.map(async (key) => toRail(key, await railTitles(key, { user, type, limit: RAIL_SIZE }))));
 };
 
-// ---------------------------------------------------------------- progress (used by the player in phase 4)
+/**
+ * GET /rails?page= and GET /recommendations/home: every rail of a page, first 16 titles each, in the page's
+ * order; empty rails are left out. Shared rails are cached for 5 minutes, a user's personal rails (Continue
+ * Watching, Because You Watched) for 2 minutes and dropped as soon as their progress changes.
+ */
+export const railsForPage = async (pageKey, user) => {
+  const keys = PAGES[pageKey];
+  const shared = keys.filter((key) => !RAILS[key].personal);
+  const personal = user ? keys.filter((key) => RAILS[key].personal) : [];
+  const [sharedRails, personalRails] = await Promise.all([
+    cache.get(`rails:${pageKey}`, GLOBAL_TTL, () => loadRails(shared, pageKey)),
+    personal.length
+      ? cache.get(`user:${user.id}:${pageKey}`, PERSONAL_TTL, () => loadRails(personal, pageKey, user))
+      : [],
+  ]);
+  const byKey = new Map([...sharedRails, ...personalRails].map((rail) => [rail.key, rail]));
+  return keys.map((key) => byKey.get(key)).filter((rail) => rail && rail.items.length > 0);
+};
 
-const COMPLETE_AT = 0.92;
+/** Drops a user's cached personal rails (their progress or history changed) */
+export const clearUserRails = (user) => cache.clear(`user:${user.id}:`);
+
+// ---------------------------------------------------------------- progress (written by the player)
+
+/** Past this share of the running time a title or episode counts as finished */
+export const COMPLETE_AT = 0.95;
 
 /** PUT /me/progress */
 export const saveProgress = async (user, { titleId, episodeId = null, positionSec, durationSec }) => {
   const title = await Title.exists({ _id: titleId, isPublished: true });
   if (!title) throw new ApiError(httpStatus.NOT_FOUND, 'Title not found');
   const completed = durationSec > 0 && positionSec / durationSec >= COMPLETE_AT;
-  return WatchProgress.findOneAndUpdate(
+  const progress = await WatchProgress.findOneAndUpdate(
     { user: user.id, title: titleId, episode: episodeId },
-    { $set: { positionSec, durationSec, completed } },
+    // watching again brings a removed title back to Continue Watching
+    { $set: { positionSec, durationSec, completed, dismissed: false } },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
+  clearUserRails(user);
+  return progress;
 };
 
-/** DELETE /me/progress/:titleId ("remove from Continue Watching") */
+/**
+ * DELETE /me/progress/:titleId ("Remove from Continue Watching"). Hides the title from the row but keeps its
+ * history (resume points, recommendations); saving progress for it again brings it back.
+ */
 export const removeProgress = async (user, titleId) => {
-  await WatchProgress.deleteMany({ user: user.id, title: titleId });
+  // timestamps off: hiding (and Undo) must not move the title in "last watched" order
+  await WatchProgress.updateMany(
+    { user: user.id, title: titleId },
+    { $set: { dismissed: true } },
+    { timestamps: false }
+  );
+  clearUserRails(user);
+};
+
+/** POST /me/progress/:titleId/restore: Undo for Remove (the title is back in Continue Watching as it was) */
+export const restoreProgress = async (user, titleId) => {
+  await WatchProgress.updateMany(
+    { user: user.id, title: titleId },
+    { $set: { dismissed: false } },
+    { timestamps: false }
+  );
+  clearUserRails(user);
 };

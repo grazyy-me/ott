@@ -12,6 +12,9 @@ const router = express.Router();
 router.get('/rails', optionalAuth(), validateZod(railValidation.listRails), railController.listRails);
 router.get('/rails/:key/titles', optionalAuth(), validateZod(railValidation.railTitles), railController.railTitles);
 
+// Home's ready-made rails: view-ranked Trending / Most Watched, scored Because You Watched, Continue Watching
+router.get('/recommendations/home', optionalAuth(), railController.homeRecommendations);
+
 // the FilterBar's country / language / year options
 router.get('/titles/facets', validateZod(railValidation.facets), railController.facets);
 
@@ -28,6 +31,13 @@ router.delete(
   auth(),
   validateZod(railValidation.removeProgress),
   railController.removeProgress
+);
+
+router.post(
+  '/me/progress/:titleId/restore',
+  auth(),
+  validateZod(railValidation.removeProgress),
+  railController.restoreProgress
 );
 
 export default router;
