@@ -1,7 +1,8 @@
 import { Link } from 'react-router'
 import type { TitleCard } from '@/types/catalog'
-import { Check, ChevronDown, Play, Plus } from 'lucide-react'
+import { Check, ChevronDown, Lock, Play, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useEntitlement } from '@/features/billing/billing-api'
 import { useWatchlistToggle } from '@/features/catalog/watchlist-api'
 import { useTitleLink } from './use-title-link'
 
@@ -9,8 +10,8 @@ const ring =
   'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
 
 /**
- * Play: goes to the player (/watch/:slug). Playing needs an account, so signed out the protected route
- * sends you to sign-in first and back here afterwards.
+ * Play: goes to the player (/watch/:slug). Free titles play for anyone. On a Premium title without a
+ * subscription it reads "Subscribe to watch" with a lock, and the player opens the paywall with checkout.
  */
 export function PlayButton({
   title,
@@ -18,16 +19,21 @@ export function PlayButton({
   onNavigate,
   className,
 }: {
-  title: Pick<TitleCard, 'slug' | 'title'>
+  title: Pick<TitleCard, 'slug' | 'title' | 'isFree'>
   compact?: boolean
   onNavigate?: () => void
   className?: string
 }) {
+  const { entitled, loading } = useEntitlement()
+  const locked = !title.isFree && !entitled && !loading
+  const Icon = locked ? Lock : Play
+  const label = locked ? 'Subscribe to watch' : 'Play'
   return (
     <Link
       to={`/watch/${title.slug}`}
       onClick={onNavigate}
-      aria-label={compact ? `Play ${title.title}` : undefined}
+      aria-label={compact ? `${label} ${title.title}` : undefined}
+      title={compact ? label : undefined}
       className={cn(
         'inline-flex items-center justify-center gap-2 rounded-full bg-primary font-semibold text-primary-foreground transition-[opacity,transform] hover:opacity-90 active:scale-[0.97]',
         compact ? 'size-10' : 'h-12 px-7 text-base',
@@ -35,10 +41,10 @@ export function PlayButton({
         className
       )}
     >
-      <Play
-        className={compact ? 'size-4 fill-current' : 'size-5 fill-current'}
+      <Icon
+        className={cn(compact ? 'size-4' : 'size-5', !locked && 'fill-current')}
       />
-      {!compact && 'Play'}
+      {!compact && label}
     </Link>
   )
 }

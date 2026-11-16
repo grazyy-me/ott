@@ -14,8 +14,8 @@ const COLUMNS = [
   {
     heading: 'Account',
     links: [
-      { label: 'Plans', to: '/plans' },
-      { label: 'Your account', to: '/settings' },
+      { label: 'Plans', to: '/pricing' },
+      { label: 'Your account', to: '/account' },
       { label: 'Sign in', to: '/sign-in' },
     ],
   },

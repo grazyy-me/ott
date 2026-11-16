@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import type { ApiResponse } from '@/types/api'
 import type { Rail, RailItem } from '@/types/catalog'
-import type { Playback, ProgressUpdate } from '@/types/playback'
+import type { Playback, ProgressUpdate, Stream } from '@/types/playback'
 import { toast } from 'sonner'
 import { store, type RootState } from '@/app/store'
 import { baseApi } from '@/services/base-api'
@@ -21,6 +21,17 @@ export const playbackApi = api.injectEndpoints({
         url: `/playback/${titleId}`,
         method: 'POST',
         body: { episodeId: episodeId ?? null },
+      }),
+      keepUnusedDataFor: 0,
+    }),
+    /** The video URL, behind the subscription check (402 → paywall). Never cached. */
+    getStream: build.query<
+      ApiResponse<Stream>,
+      { titleId: string; episodeId?: string }
+    >({
+      query: ({ titleId, episodeId }) => ({
+        url: `/titles/${titleId}/stream`,
+        params: episodeId ? { episodeId } : undefined,
       }),
       keepUnusedDataFor: 0,
     }),
@@ -92,6 +103,7 @@ export const playbackApi = api.injectEndpoints({
 
 export const {
   useGetPlaybackQuery,
+  useGetStreamQuery,
   useLogViewMutation,
   useSaveProgressMutation,
   useRemoveFromContinueWatchingMutation,

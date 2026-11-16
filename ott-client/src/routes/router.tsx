@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, Navigate } from 'react-router'
 import { store } from '@/app/store'
 import { GuestRoute } from '@/components/auth/guest-route'
 import { ProtectedRoute } from '@/components/auth/protected-route'
@@ -158,6 +158,27 @@ export const router = createBrowserRouter([
             }),
           },
           {
+            path: '/pricing',
+            lazy: async () => ({
+              Component: (await import('@/features/billing/pricing-page'))
+                .PricingPage,
+            }),
+          },
+          // the old footer link
+          { path: '/plans', element: <Navigate to='/pricing' replace /> },
+          {
+            element: <ProtectedRoute />,
+            children: [
+              {
+                path: '/account',
+                lazy: async () => ({
+                  Component: (await import('@/features/billing/account-page'))
+                    .AccountPage,
+                }),
+              },
+            ],
+          },
+          {
             path: '/browse/:key',
             lazy: async () => ({
               Component: (await import('@/features/browse/show-all-page'))
@@ -191,17 +212,14 @@ export const router = createBrowserRouter([
         ],
       },
 
-      // The player: full screen, outside the stream shell (no navbar, footer or Lenis). Playing needs an account.
-      {
-        element: <ProtectedRoute />,
-        children: ['/watch/:slug', '/watch/:slug/:episodeId'].map((path) => ({
-          path,
-          lazy: async () => ({
-            Component: (await import('@/features/watch/player-page'))
-              .PlayerPage,
-          }),
-        })),
-      },
+      // The player: full screen, outside the stream shell (no navbar, footer or Lenis). Public: guests can play
+      // free titles; the server's stream endpoint decides (402 → paywall for everything else).
+      ...['/watch/:slug', '/watch/:slug/:episodeId'].map((path) => ({
+        path,
+        lazy: async () => ({
+          Component: (await import('@/features/watch/player-page')).PlayerPage,
+        }),
+      })),
 
       // Error pages
       { path: '/401', element: <UnauthorisedError /> },

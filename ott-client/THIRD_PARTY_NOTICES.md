@@ -51,6 +51,7 @@ author) before a commercial launch.
 | `src/components/motion/use-hide-on-scroll.ts` | Hide On Scroll (its useHideOnScroll hook) | ddoemonn |
 | `src/components/stream/glass-select.tsx` | Liquid Select | liquefy-ui |
 | `src/components/stream/animated-chips.tsx` | Animated Tags | socolled |
+| `src/components/stream/pricing-plans.tsx` | Pricing Section with Monthly/Yearly Toggle (ink-orbit-pricing) | kedhareswer |
 
 ## Fonts
 

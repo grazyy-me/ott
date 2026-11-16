@@ -197,8 +197,8 @@ function ProfileMenu({
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild className='rounded-lg'>
-            <Link to='/settings'>
-              <UserRound aria-hidden='true' /> Account
+            <Link to='/account'>
+              <UserRound aria-hidden='true' /> Account & plan
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />

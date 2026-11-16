@@ -10,13 +10,11 @@ export interface PlaybackEpisode {
   hasVideo: boolean
 }
 
-/** POST /playback/:titleId */
+/** POST /playback/:titleId: what to play and where to start (never the video URL) */
 export interface Playback {
-  /** HLS manifest URL */
-  src: string
-  expiresAt: string
-  /** Seconds to start from (0: from the beginning) */
+  /** Seconds to start from (0: from the beginning, and always for guests) */
   resumeAt: number
+  isFree: boolean
   title: {
     id: string
     slug: string
@@ -38,4 +36,11 @@ export interface ProgressUpdate {
   episodeId?: string | null
   positionSec: number
   durationSec: number
+}
+
+/** GET /titles/:id/stream: the only place the video URL comes from (402 without access) */
+export interface Stream {
+  /** HLS manifest URL */
+  src: string
+  expiresAt: string
 }

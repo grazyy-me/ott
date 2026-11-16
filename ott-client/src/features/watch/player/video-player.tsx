@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import type { Season } from '@/types/catalog'
 import type { Playback } from '@/types/playback'
 import {
@@ -52,9 +52,15 @@ const iconButton =
  */
 export function VideoPlayer({
   playback,
+  src,
+  guest = false,
   seasons,
 }: {
   playback: Playback
+  /** From GET /titles/:id/stream */
+  src: string
+  /** Signed out (free titles only): no progress saved, no view logged */
+  guest?: boolean
   /** For the episodes panel (series only) */
   seasons: Season[]
 }) {
@@ -67,10 +73,8 @@ export function VideoPlayer({
   const shell = useRef<HTMLDivElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const [failed, setFailed] = useState(false)
-  const { levels, level, chooseLevel, playingHeight } = useHls(
-    video,
-    playback.src,
-    () => setFailed(true)
+  const { levels, level, chooseLevel, playingHeight } = useHls(video, src, () =>
+    setFailed(true)
   )
 
   const [playing, setPlaying] = useState(false)
@@ -99,7 +103,9 @@ export function VideoPlayer({
   // ---------------------------------------------------------------- progress
   const progressNow = useCallback(() => {
     const el = video.current
+    // guests have no account to save to
     if (
+      guest ||
       !el ||
       !el.duration ||
       !Number.isFinite(el.duration) ||
@@ -112,7 +118,7 @@ export function VideoPlayer({
       positionSec: Math.floor(el.currentTime),
       durationSec: Math.floor(el.duration),
     }
-  }, [title.id, episodeId])
+  }, [guest, title.id, episodeId])
 
   const save = useCallback(() => {
     const update = progressNow()
@@ -166,7 +172,7 @@ export function VideoPlayer({
           setWaiting(false)
           if (!viewLogged.current) {
             viewLogged.current = true
-            logView({ titleId: title.id, episodeId })
+            if (!guest) logView({ titleId: title.id, episodeId })
           }
         },
       ],
@@ -216,12 +222,13 @@ export function VideoPlayer({
         'ended',
         () => {
           setPlaying(false)
-          saveProgress({
-            titleId: title.id,
-            episodeId,
-            positionSec: Math.floor(el.duration),
-            durationSec: Math.floor(el.duration),
-          })
+          if (!guest)
+            saveProgress({
+              titleId: title.id,
+              episodeId,
+              positionSec: Math.floor(el.duration),
+              durationSec: Math.floor(el.duration),
+            })
           if (next?.hasVideo && !reduced) setCountdown(COUNTDOWN_SEC)
         },
       ],
@@ -259,6 +266,7 @@ export function VideoPlayer({
       window.clearTimeout(seekTimer)
     }
   }, [
+    guest,
     playback.resumeAt,
     title.id,
     episodeId,
@@ -574,6 +582,14 @@ export function VideoPlayer({
             </p>
           )}
         </div>
+        {guest && (
+          <Link
+            to={`/sign-in?redirect=${encodeURIComponent(`/watch/${title.slug}${episode ? `/${episode.id}` : ''}`)}`}
+            className='ml-auto inline-flex h-9 shrink-0 items-center rounded-full glass px-4 text-sm font-semibold outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring'
+          >
+            Sign in to keep your place
+          </Link>
+        )}
       </div>
 
       {resumed !== null && (
