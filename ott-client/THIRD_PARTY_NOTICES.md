@@ -31,3 +31,26 @@ SOFTWARE.
 
 The automatic re-authentication in `src/services/base-api.ts` follows the pattern in the
 official Redux Toolkit documentation ("Preventing multiple unauthorized errors").
+
+## 21st.dev community components
+
+The files below are adapted from public components on 21st.dev, retrieved through the 21st.dev registry with
+this project's paid account. Each file's header names the original, its author and URL, and what was changed.
+The registry entries carry no explicit licence text; confirm the terms on each component's page (or with the
+author) before a commercial launch.
+
+| File | Original | Author |
+| --- | --- | --- |
+| `src/components/stream/stream-nav.tsx` | Floating Glassmorphic Navbar with Morphing Pill Indicator | themeocean |
+| `src/components/stream/filmstrip-hero.tsx` | Hero Carousel | crafterui |
+| `src/components/stream/interactive-selector.tsx` | Interactive Selector | minhxthanh |
+| `src/components/stream/coverflow-carousel.tsx` | Glassy Coverflow Carousel (geometry from educalvolpz/coverflow-carousel) | automate_flows |
+| `src/components/stream/endless-corridor.tsx` | Endless | helloweblisy |
+| `src/components/stream/curved-lens-carousel.tsx` | 3D Curved Carousel | kedhareswer |
+| `src/components/stream/chapter-hero.tsx` | Scroll-Triggered Video Hero | daiwiikharihar |
+
+## Fonts
+
+`public/fonts/` holds Inter, Bricolage Grotesque and Manrope (latin, variable weight), copied from the
+`@fontsource-variable` packages by `npm run fonts:copy`. All three are licensed under the SIL Open Font
+License 1.1 (see each package's `LICENSE` file in `node_modules/@fontsource-variable/`).

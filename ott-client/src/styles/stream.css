@@ -1,0 +1,124 @@
+/*
+ * Streaming surface: dark-only design tokens.
+ * StreamLayout sets html[data-surface='stream'] while a stream page is mounted, so these override the kit's
+ * light/dark tokens for the whole document, including portals (dialogs, toasts, popovers).
+ * Components use the Tailwind names below (bg-background, text-glow-1, glass, text-display-1 ...), never raw colors.
+ */
+html[data-surface='stream'] {
+  color-scheme: dark;
+
+  /* shadcn tokens, re-tuned for a cinematic near-black */
+  --background: oklch(0.13 0.012 275);
+  --foreground: oklch(0.97 0.004 275);
+  --card: oklch(0.17 0.014 275);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.18 0.015 275);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.97 0.004 275); /* white pill buttons */
+  --primary-foreground: oklch(0.15 0.012 275);
+  --secondary: oklch(0.24 0.015 275);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.22 0.014 275);
+  --muted-foreground: oklch(0.74 0.012 275);
+  --accent: oklch(1 0 0 / 9%);
+  --accent-foreground: var(--foreground);
+  --destructive: oklch(0.65 0.21 25);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.74 0.16 45);
+
+  /* accent gradient: ember -> magenta -> violet */
+  --stream-glow-1: oklch(0.74 0.16 45);
+  --stream-glow-2: oklch(0.65 0.22 355);
+  --stream-glow-3: oklch(0.6 0.2 295);
+  --stream-gradient: linear-gradient(100deg, var(--stream-glow-1), var(--stream-glow-2) 50%, var(--stream-glow-3));
+
+  /* glass panels */
+  --glass-bg: oklch(0.2 0.015 275 / 55%);
+  --glass-bg-strong: oklch(0.17 0.015 275 / 82%);
+  --glass-border: oklch(1 0 0 / 10%);
+  --glass-highlight: oklch(1 0 0 / 14%);
+  --glass-shadow: 0 18px 50px -18px oklch(0 0 0 / 70%);
+
+  /* image scrims, so text over backdrops stays readable */
+  --scrim-bottom: linear-gradient(to top, var(--background) 0%, oklch(0.13 0.012 275 / 75%) 30%, transparent 70%);
+  --scrim-left: linear-gradient(to right, oklch(0.13 0.012 275 / 92%) 0%, oklch(0.13 0.012 275 / 55%) 40%, transparent 75%);
+
+  --grain-opacity: 0.06;
+
+  background-color: var(--background);
+}
+
+@theme inline {
+  --color-glow-1: var(--stream-glow-1);
+  --color-glow-2: var(--stream-glow-2);
+  --color-glow-3: var(--stream-glow-3);
+  --font-display: 'Bricolage Grotesque', 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Display type scale: fluid, tight, for hero titles and section headings */
+@theme {
+  --text-display-1: clamp(3rem, 1.6rem + 6.4vw, 8.5rem);
+  --text-display-1--line-height: 0.9;
+  --text-display-1--letter-spacing: -0.04em;
+  --text-display-2: clamp(2.25rem, 1.4rem + 3.8vw, 5.25rem);
+  --text-display-2--line-height: 0.96;
+  --text-display-2--letter-spacing: -0.03em;
+  --text-display-3: clamp(1.625rem, 1.2rem + 1.9vw, 3rem);
+  --text-display-3--line-height: 1.04;
+  --text-display-3--letter-spacing: -0.02em;
+  --text-eyebrow: 0.75rem;
+  --text-eyebrow--line-height: 1;
+  --text-eyebrow--letter-spacing: 0.22em;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility glass {
+  background-color: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+
+  @supports not (backdrop-filter: blur(1px)) {
+    background-color: var(--glass-bg-strong);
+  }
+}
+
+@utility glass-strong {
+  background-color: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+}
+
+@utility bg-stream-gradient {
+  background-image: var(--stream-gradient);
+}
+
+/* Page gutter + max width for stream pages */
+@utility shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 88rem;
+  padding-inline: clamp(1.25rem, 4vw, 3rem);
+}
+
+@utility scrim-bottom {
+  background-image: var(--scrim-bottom);
+}
+
+@utility scrim-left {
+  background-image: var(--scrim-left);
+}
+
+/* Lenis owns smooth scrolling; native smooth scrolling would fight it */
+html[data-surface='stream'].lenis {
+  scroll-behavior: auto;
+}

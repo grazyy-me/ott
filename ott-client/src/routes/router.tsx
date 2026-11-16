@@ -1,37 +1,73 @@
 import { createBrowserRouter } from 'react-router'
+import { store } from '@/app/store'
 import { GuestRoute } from '@/components/auth/guest-route'
 import { ProtectedRoute } from '@/components/auth/protected-route'
 import { RootLayout } from '@/components/layout/root-layout'
-import { ForgotPassword } from '@/features/auth/forgot-password'
-import { OAuthSuccess } from '@/features/auth/oauth-success'
-import { ResetPassword } from '@/features/auth/reset-password'
-import { SignIn } from '@/features/auth/sign-in'
-import { SignUp } from '@/features/auth/sign-up'
-import { VerifyEmail } from '@/features/auth/verify-email'
+import { catalogApi } from '@/features/catalog/catalog-api'
 import { ForbiddenError } from '@/features/errors/forbidden'
 import { GeneralError } from '@/features/errors/general-error'
 import { NotFoundError } from '@/features/errors/not-found-error'
 import { UnauthorisedError } from '@/features/errors/unauthorized-error'
+import { LAB_TITLES_QUERY } from '@/features/lab/query'
+
+// Fires the request into the RTK Query cache without waiting; the page's hook picks up the same entry
+const prefetchLabData = () => {
+  store.dispatch(catalogApi.util.prefetch('getTitles', LAB_TITLES_QUERY, {}))
+}
 
 export const router = createBrowserRouter([
   {
     element: <RootLayout />,
     errorElement: <GeneralError />,
     children: [
-      // Signed-out pages
+      // Signed-out pages. Lazy, like everything else: the forms (react-hook-form, zod, Radix) would
+      // otherwise sit in the entry bundle that every stream page downloads first.
       {
         element: <GuestRoute />,
         children: [
-          { path: '/sign-in', element: <SignIn /> },
-          { path: '/sign-up', element: <SignUp /> },
-          { path: '/forgot-password', element: <ForgotPassword /> },
-          { path: '/reset-password', element: <ResetPassword /> },
+          {
+            path: '/sign-in',
+            lazy: async () => ({
+              Component: (await import('@/features/auth/sign-in')).SignIn,
+            }),
+          },
+          {
+            path: '/sign-up',
+            lazy: async () => ({
+              Component: (await import('@/features/auth/sign-up')).SignUp,
+            }),
+          },
+          {
+            path: '/forgot-password',
+            lazy: async () => ({
+              Component: (await import('@/features/auth/forgot-password'))
+                .ForgotPassword,
+            }),
+          },
+          {
+            path: '/reset-password',
+            lazy: async () => ({
+              Component: (await import('@/features/auth/reset-password'))
+                .ResetPassword,
+            }),
+          },
         ],
       },
 
       // Work signed in or out
-      { path: '/verify-email', element: <VerifyEmail /> },
-      { path: '/oauth/success', element: <OAuthSuccess /> },
+      {
+        path: '/verify-email',
+        lazy: async () => ({
+          Component: (await import('@/features/auth/verify-email')).VerifyEmail,
+        }),
+      },
+      {
+        path: '/oauth/success',
+        lazy: async () => ({
+          Component: (await import('@/features/auth/oauth-success'))
+            .OAuthSuccess,
+        }),
+      },
 
       // Signed-in app
       {
@@ -75,6 +111,40 @@ export const router = createBrowserRouter([
                 ],
               },
             ],
+          },
+        ],
+      },
+
+      // Stream pages: public, dark, smooth-scrolled shell (lazy, so motion libraries stay out of other bundles)
+      {
+        lazy: async () => ({
+          Component: (await import('@/components/layout/stream-layout'))
+            .StreamLayout,
+        }),
+        children: [
+          {
+            path: '/lab',
+            // start the catalog request now, in parallel with downloading the page's code
+            loader: () => {
+              prefetchLabData()
+              return null
+            },
+            lazy: async () => ({
+              Component: (await import('@/features/lab')).Lab,
+            }),
+          },
+          {
+            path: '/lab/components',
+            lazy: async () => ({
+              Component: (await import('@/features/lab/components'))
+                .LabComponents,
+            }),
+          },
+          {
+            path: '/lab/next',
+            lazy: async () => ({
+              Component: (await import('@/features/lab/next')).LabNext,
+            }),
           },
         ],
       },

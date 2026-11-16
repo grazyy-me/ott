@@ -1,8 +1,10 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import './theme.css';
+@import './stream.css';
 
-@custom-variant dark (&:is(.dark *));
+/* Stream pages are always dark, whatever the kit's theme setting says */
+@custom-variant dark (&:is(.dark *, [data-surface='stream'] *));
 
 @layer base {
   * {

@@ -1,0 +1,350 @@
+/*
+ * Adapted from "Floating Glassmorphic Navbar with Morphing Pill Indicator" by themeocean on 21st.dev:
+ * https://21st.dev/@themeocean/components/floating-glassmorphic-navbar-with-morphing-pill-indicator
+ * Changes: react-router links with the active link taken from the URL; the sliding highlight is a measured
+ * CSS-transition pill instead of a framer-motion layoutId, and the entrance runs on anime.js (CLAUDE.md keeps
+ * framer-motion for route and modal transitions; the small-screen menu panel still uses AnimatePresence);
+ * glass tokens; search and account actions in place of the single call-to-action button.
+ */
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { Link, NavLink, useLocation } from 'react-router'
+import { animate } from 'animejs'
+import { AnimatePresence, m } from 'framer-motion'
+import { Search } from 'lucide-react'
+import { useAppSelector } from '@/app/hooks'
+import { APP_NAME } from '@/lib/config'
+import { cn } from '@/lib/utils'
+import { useMotion } from '@/components/motion'
+import { UserAvatar } from '@/components/user-avatar'
+import { selectAuthStatus, selectCurrentUser } from '@/features/auth/auth-slice'
+
+const NAV_ITEMS = [
+  { label: 'Home', to: '/' },
+  { label: 'Movies', to: '/movies' },
+  { label: 'Series', to: '/series' },
+  { label: 'Reality', to: '/reality' },
+] as const
+
+const SPRING = {
+  type: 'spring',
+  stiffness: 420,
+  damping: 34,
+  mass: 0.8,
+} as const
+
+const isActivePath = (pathname: string, to: string) =>
+  to === '/'
+    ? pathname === '/'
+    : pathname === to || pathname.startsWith(`${to}/`)
+
+function NavLinks({
+  vertical = false,
+  onNavigate,
+}: {
+  vertical?: boolean
+  onNavigate?: () => void
+}) {
+  const { pathname } = useLocation()
+  const { reduced } = useMotion()
+  const listRef = useRef<HTMLUListElement>(null)
+  const [hovered, setHovered] = useState<string | null>(null)
+  const [pill, setPill] = useState<{
+    left: number
+    width: number
+    top: number
+    height: number
+  } | null>(null)
+  const [settled, setSettled] = useState(false)
+
+  const active =
+    NAV_ITEMS.find((item) => isActivePath(pathname, item.to))?.to ?? null
+  // the pill sits on the link you point at, and goes back to the current page's link when you move away
+  const highlighted = hovered ?? active
+
+  useLayoutEffect(() => {
+    const list = listRef.current
+    if (!list) return
+    const measure = () => {
+      const link = highlighted
+        ? list.querySelector<HTMLElement>(`[data-to="${highlighted}"]`)
+        : null
+      setPill(
+        link
+          ? {
+              left: link.offsetLeft,
+              width: link.offsetWidth,
+              top: link.offsetTop,
+              height: link.offsetHeight,
+            }
+          : null
+      )
+    }
+    measure()
+    // link widths change when the web font arrives or the list resizes
+    const resize = new ResizeObserver(measure)
+    resize.observe(list)
+    document.fonts?.ready.then(measure)
+    return () => resize.disconnect()
+  }, [highlighted])
+
+  // no slide on the very first placement
+  useEffect(() => {
+    if (pill && !settled) requestAnimationFrame(() => setSettled(true))
+  }, [pill, settled])
+
+  return (
+    <ul
+      ref={listRef}
+      role='list'
+      className={cn(
+        'relative flex',
+        vertical ? 'flex-col gap-1' : 'items-center gap-1'
+      )}
+      onPointerLeave={() => setHovered(null)}
+    >
+      {pill && (
+        <span
+          aria-hidden='true'
+          className={cn(
+            'absolute rounded-full bg-accent',
+            settled &&
+              !reduced &&
+              'transition-[left,top,width,height] duration-300 ease-out-expo'
+          )}
+          style={pill}
+        />
+      )}
+      {NAV_ITEMS.map((item) => (
+        <li key={item.to} className='relative'>
+          <NavLink
+            to={item.to}
+            end={item.to === '/'}
+            data-to={item.to}
+            onClick={onNavigate}
+            onPointerEnter={(e) =>
+              e.pointerType === 'mouse' && setHovered(item.to)
+            }
+            onFocus={() => setHovered(item.to)}
+            onBlur={() => setHovered(null)}
+            className={cn(
+              'relative flex items-center rounded-full px-4 py-2 text-sm font-medium transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              vertical && 'py-3 text-base',
+              item.to === highlighted
+                ? 'text-foreground'
+                : 'text-muted-foreground'
+            )}
+          >
+            {item.label}
+            {item.to === active && (
+              <span
+                aria-hidden='true'
+                className='ml-2 size-1.5 rounded-full bg-stream-gradient'
+              />
+            )}
+          </NavLink>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function AccountAction() {
+  const status = useAppSelector(selectAuthStatus)
+  const user = useAppSelector(selectCurrentUser)
+  const { pathname, search } = useLocation()
+
+  // keep the slot's size while the session is being checked, so the bar doesn't shift
+  if (status === 'checking')
+    return <span aria-hidden='true' className='size-10' />
+  if (status === 'authenticated') {
+    return (
+      <Link
+        to='/settings'
+        aria-label='Your account'
+        className='rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring'
+      >
+        <UserAvatar user={user} className='size-10' />
+      </Link>
+    )
+  }
+  return (
+    <Link
+      to={`/sign-in?redirect=${encodeURIComponent(pathname + search)}`}
+      className='inline-flex h-10 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.97]'
+    >
+      Sign in
+    </Link>
+  )
+}
+
+export function StreamNav() {
+  const { pathname } = useLocation()
+  const { reduced } = useMotion()
+  // the menu remembers the route it was opened on, so navigating anywhere closes it
+  const [openOn, setOpenOn] = useState<string | null>(null)
+  const open = openOn === pathname
+  const [scrolled, setScrolled] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const panelId = useId()
+
+  // entrance: drop in once
+  useLayoutEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const animation = reduced
+      ? animate(el, { opacity: [0, 1], duration: 300, ease: 'linear' })
+      : animate(el, {
+          opacity: [0, 1],
+          y: [-24, 0],
+          duration: 900,
+          delay: 120,
+          ease: 'outExpo',
+        })
+    return () => {
+      animation.revert()
+    }
+    // only on mount: a motion setting change later shouldn't replay it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // ... and on Escape, an outside click, or when the screen grows past the breakpoint
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpenOn(null)
+        toggleRef.current?.focus()
+      }
+    }
+    const onPointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node))
+        setOpenOn(null)
+    }
+    const wide = window.matchMedia('(min-width: 768px)')
+    const onWide = (e: MediaQueryListEvent) => e.matches && setOpenOn(null)
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown)
+    wide.addEventListener('change', onWide)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown)
+      wide.removeEventListener('change', onWide)
+    }
+  }, [open])
+
+  return (
+    <header className='pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-3 sm:top-4'>
+      <div
+        ref={rootRef}
+        className='pointer-events-auto relative w-full max-w-md md:w-auto md:max-w-none'
+      >
+        <nav
+          aria-label='Main'
+          className={cn(
+            'relative flex items-center justify-between gap-2 rounded-full px-2 py-2 transition-[background-color] duration-300 md:gap-6',
+            scrolled ? 'glass-strong' : 'glass'
+          )}
+        >
+          {/* thin light along the top edge */}
+          <span
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-foreground/25 to-transparent'
+          />
+
+          <Link
+            to='/'
+            className='flex items-center gap-2.5 rounded-full py-1 pr-3 pl-1 transition-opacity outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring'
+          >
+            <span
+              aria-hidden='true'
+              className='size-8 shrink-0 rounded-full bg-stream-gradient'
+            />
+            <span className='font-display text-lg font-bold tracking-tight'>
+              {APP_NAME}
+            </span>
+          </Link>
+
+          <div className='hidden md:block'>
+            <NavLinks />
+          </div>
+
+          <div className='flex items-center gap-1.5'>
+            <Link
+              to='/search'
+              aria-label='Search'
+              className='flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring'
+            >
+              <Search className='size-[18px]' aria-hidden='true' />
+            </Link>
+            <div className='hidden md:block'>
+              <AccountAction />
+            </div>
+
+            <button
+              ref={toggleRef}
+              type='button'
+              onClick={() => setOpenOn(open ? null : pathname)}
+              aria-expanded={open}
+              aria-controls={panelId}
+              aria-label={open ? 'Close menu' : 'Open menu'}
+              className='relative flex size-10 shrink-0 items-center justify-center rounded-full transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring md:hidden'
+            >
+              <span aria-hidden='true' className='relative block h-3.5 w-5'>
+                <span
+                  className={cn(
+                    'absolute left-0 block h-0.5 w-5 rounded-full bg-current transition-all duration-300 motion-reduce:transition-none',
+                    open ? 'top-1.5 rotate-45' : 'top-0'
+                  )}
+                />
+                <span
+                  className={cn(
+                    'absolute top-1.5 left-0 block h-0.5 w-5 rounded-full bg-current transition-all duration-200 motion-reduce:transition-none',
+                    open ? 'scale-x-0 opacity-0' : 'opacity-100'
+                  )}
+                />
+                <span
+                  className={cn(
+                    'absolute left-0 block h-0.5 w-5 rounded-full bg-current transition-all duration-300 motion-reduce:transition-none',
+                    open ? 'top-1.5 -rotate-45' : 'top-3'
+                  )}
+                />
+              </span>
+            </button>
+          </div>
+        </nav>
+
+        <AnimatePresence>
+          {open && (
+            <m.div
+              id={panelId}
+              initial={
+                reduced ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.97 }
+              }
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={
+                reduced ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.97 }
+              }
+              transition={reduced ? { duration: 0.1 } : SPRING}
+              style={{ transformOrigin: 'top center' }}
+              className='absolute inset-x-0 top-full mt-2 rounded-3xl glass-strong p-2 md:hidden'
+            >
+              <NavLinks vertical onNavigate={() => setOpenOn(null)} />
+              <div className='mt-2 flex items-center justify-between border-t border-border p-2 pt-3'>
+                <span className='text-sm text-muted-foreground'>Account</span>
+                <AccountAction />
+              </div>
+            </m.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </header>
+  )
+}
