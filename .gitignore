@@ -1,6 +1,7 @@
 # local tooling
 .claude/
 graphify-out/
+.impeccable/
 .graphifyignore
 
 # secrets (each app also ignores its own)
