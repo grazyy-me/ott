@@ -1,8 +1,10 @@
-# Render Blueprint: New > Blueprint in the Render dashboard, then fill in the secret values.
+# Render Blueprint: New > Blueprint in the Render dashboard, pick this repo, then fill in the secret values.
+# Blank optional keys switch that feature off (emails log to the console, no OAuth, no checkout).
 services:
   - type: web
     name: ott-server
     runtime: node
+    rootDir: ott-server
     plan: free
     buildCommand: npm ci
     startCommand: npm start
