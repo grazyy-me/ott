@@ -12,7 +12,12 @@ export const PLANS = {
     currency: 'INR',
     // Razorpay needs a number of billing cycles; 10 years of renewals
     totalCount: 120,
-    features: ['Every title, ad-free', 'Full HD streaming', 'Watch on 2 screens', 'Cancel anytime'],
+    // only claims the product keeps today: no screen limits or quality tiers exist, so none are promised
+    features: [
+      'Every movie, series and reality show in the catalogue',
+      'Pick up where you left off, on any device',
+      'Cancel anytime and keep access until the period ends',
+    ],
   },
   yearly: {
     code: 'yearly',
@@ -21,7 +26,11 @@ export const PLANS = {
     amountPaise: 199900,
     currency: 'INR',
     totalCount: 10,
-    features: ['Everything in Monthly', '2 months free', 'Watch on 4 screens', 'Cancel anytime'],
+    features: [
+      'Everything in Monthly',
+      'One payment a year, ₹389 less than paying monthly',
+      'Cancel anytime and keep access until the period ends',
+    ],
   },
 };
 
