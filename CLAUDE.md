@@ -10,7 +10,10 @@ used by `EMAIL_FROM` and email templates). Never hard-code "Streamly" anywhere e
 
 - `ott-server/`: Express + MongoDB API, deployed to Render. Copied from `mern-starter-server`.
 - `ott-client/`: React 19 + Vite + TS + Tailwind 4 + shadcn, deployed to Vercel. Copied from `mern-starter-client`.
-- These are two separate git repos, like the kit. Run the server on port 5000, then the client on 5173.
+- One git repo at `D:\project\ott` (GitHub: grazyy-me/ott, public) holding both folders; their earlier
+  separate histories were merged in on 2026-11-17 (old `.git` folders backed up in `D:\project\ott-git-backup`).
+  Run the server on port 5000, then the client on 5173. Deploys point Render at `ott-server/` and Vercel at
+  `ott-client/` as root directories.
 - Secrets go only in `.env` files, never in a README or CLAUDE.md. (The kit's root README once held live
   MongoDB credentials; they must be rotated and never copied here.)
 
