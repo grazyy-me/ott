@@ -1,0 +1,9 @@
+# local tooling
+.claude/
+graphify-out/
+.graphifyignore
+
+# secrets (each app also ignores its own)
+.env
+.env.*
+!.env.example
