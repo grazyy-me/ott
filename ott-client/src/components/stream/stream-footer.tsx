@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { Logo } from '@/assets/logo'
 import { APP_NAME } from '@/lib/config'
 
 const COLUMNS = [
@@ -21,17 +22,13 @@ const COLUMNS = [
   },
 ]
 
-// TMDB attribution goes here before launch (TMDB's terms require it); see CLAUDE.md, phase 7.
 export function StreamFooter() {
   return (
     <footer className='relative mt-24 border-t border-border'>
       <div className='grid shell gap-12 py-16 md:grid-cols-[1.4fr_1fr_1fr]'>
         <div>
           <Link to='/' className='inline-flex items-center gap-2.5'>
-            <span
-              aria-hidden='true'
-              className='size-7 rounded-full bg-stream-gradient'
-            />
+            <Logo className='h-9' />
             <span className='font-display text-xl font-bold tracking-tight'>
               {APP_NAME}
             </span>
@@ -45,12 +42,12 @@ export function StreamFooter() {
             <h2 className='text-eyebrow font-semibold text-muted-foreground uppercase'>
               {column.heading}
             </h2>
-            <ul className='mt-5 space-y-3'>
+            <ul className='mt-5 space-y-3 pointer-coarse:space-y-0'>
               {column.links.map((link) => (
                 <li key={link.to}>
                   <Link
                     to={link.to}
-                    className='text-sm text-foreground/80 transition-colors hover:text-foreground'
+                    className='inline-flex items-center text-sm text-foreground/80 transition-colors hover:text-foreground'
                   >
                     {link.label}
                   </Link>
@@ -60,8 +57,42 @@ export function StreamFooter() {
           </nav>
         ))}
       </div>
-      <div className='shell border-t border-border py-6 text-xs text-muted-foreground'>
-        © {new Date().getFullYear()} {APP_NAME}
+      <div className='grid shell gap-4 border-t border-border py-6 text-xs text-muted-foreground md:grid-cols-[1fr_auto] md:items-start'>
+        {/* TMDB's terms require this notice wherever their data or images appear */}
+        <p className='max-w-xl leading-relaxed'>
+          Title information and images from{' '}
+          <a
+            href='https://www.themoviedb.org/'
+            target='_blank'
+            rel='noopener noreferrer'
+            className='underline underline-offset-4 hover:text-foreground'
+          >
+            The Movie Database (TMDB)
+          </a>
+          . This product uses the TMDB API but is not endorsed or certified by
+          TMDB.
+        </p>
+        <nav aria-label='Legal'>
+          <ul className='flex flex-wrap gap-x-5 gap-y-2'>
+            <li>
+              © {new Date().getFullYear()} {APP_NAME}
+            </li>
+            {[
+              { label: 'Terms', to: '/terms' },
+              { label: 'Privacy', to: '/privacy' },
+              { label: 'Refunds and cancellation', to: '/refunds' },
+            ].map((link) => (
+              <li key={link.to}>
+                <Link
+                  to={link.to}
+                  className='inline-flex items-center underline-offset-4 hover:text-foreground hover:underline'
+                >
+                  {link.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
     </footer>
   )

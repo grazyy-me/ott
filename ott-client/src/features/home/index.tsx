@@ -18,6 +18,7 @@ import {
   WandSparkles,
 } from 'lucide-react'
 import { tmdbImage } from '@/lib/tmdb-image'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { cn } from '@/lib/utils'
 import { useMotion, useScrollProgress } from '@/components/motion'
 import { EndlessCorridor } from '@/components/stream/endless-corridor'
@@ -30,9 +31,11 @@ import {
   type SelectorItem,
 } from '@/components/stream/interactive-selector'
 import { SectionHeader } from '@/components/stream/section-header'
+import { useOpenTitle } from '@/components/stream/use-title-link'
 import { HeroAtmosphere } from '@/components/three/hero-atmosphere'
 import { RailsView } from '@/features/browse/rails-view'
 import { useGetTitlesQuery } from '@/features/catalog/catalog-api'
+import { useTitleModalOpen } from '@/features/title/modal-state'
 import { HOME_QUERIES } from './queries'
 
 const TYPE_LABEL = { movie: 'Movie', series: 'Series', reality: 'Reality' }
@@ -55,6 +58,7 @@ const toHeroItem = (t: TitleCard): FilmstripItem => ({
     t.genres[0]?.name ?? '',
   ].filter(Boolean),
   overview: clip(t.overview, 160),
+  trailerKey: t.trailerKey || undefined,
 })
 
 /** An icon per genre for the mood selector; matched on the genre slug */
@@ -134,6 +138,7 @@ const PIN_EXTRA_SVH = 35
 
 /** Home: the featured-titles hero with its Three.js atmosphere, then editorial bands. */
 export function Home() {
+  useDocumentTitle(null)
   const { reduced } = useMotion()
   const moviesQuery = useGetTitlesQuery(HOME_QUERIES.movies).data?.data
   const seriesQuery = useGetTitlesQuery(HOME_QUERIES.series).data?.data
@@ -148,11 +153,18 @@ export function Home() {
     (seriesQuery?.totalResults ?? 0) +
     (realityQuery?.totalResults ?? 0)
 
-  const heroItems = [
+  const heroTitles = [
     ...featurable(movies).slice(0, 5),
     ...featurable(series).slice(0, 2),
     ...featurable(reality).slice(0, 1),
-  ].map(toHeroItem)
+  ]
+  const heroItems = heroTitles.map(toHeroItem)
+  const openTitle = useOpenTitle()
+  const modalOpen = useTitleModalOpen()
+  const openHeroItem = (item: FilmstripItem, root?: HTMLElement | null) => {
+    const title = heroTitles.find((t) => t.id === item.id)
+    if (title) openTitle(title, root)
+  }
 
   const pool = [...movies, ...series, ...reality, ...topRated].filter(
     (t, i, all) => all.findIndex((u) => u.id === t.id) === i
@@ -205,9 +217,20 @@ export function Home() {
               defaultIndex={1}
               parallaxTrigger={reduced ? undefined : wrapRef}
               atmosphere={<HeroAtmosphere progressRef={progressRef} />}
-              actions={() => (
+              // the trailer stops while a title modal is open (the modal plays its own) and restarts after
+              trailers={!modalOpen}
+              onOpen={openHeroItem}
+              actions={(item) => (
                 <button
                   type='button'
+                  onClick={(e) =>
+                    openHeroItem(
+                      item,
+                      e.currentTarget
+                        .closest('section')
+                        ?.querySelector<HTMLElement>('[aria-current]')
+                    )
+                  }
                   className='inline-flex h-11 items-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90'
                 >
                   More info

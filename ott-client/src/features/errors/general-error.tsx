@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 
@@ -10,6 +11,7 @@ export function GeneralError({
   className,
   minimal = false,
 }: GeneralErrorProps) {
+  useDocumentTitle('Something went wrong')
   const navigate = useNavigate()
   return (
     <div className={cn('h-svh w-full', className)}>
@@ -23,10 +25,19 @@ export function GeneralError({
         </p>
         {!minimal && (
           <div className='mt-6 flex gap-4'>
-            <Button variant='outline' onClick={() => navigate(-1)}>
+            <Button
+              variant='outline'
+              className='pointer-coarse:h-11'
+              onClick={() => navigate(-1)}
+            >
               Go Back
             </Button>
-            <Button onClick={() => navigate('/')}>Back to Home</Button>
+            <Button
+              className='pointer-coarse:h-11'
+              onClick={() => navigate('/')}
+            >
+              Back to Home
+            </Button>
           </div>
         )}
       </div>

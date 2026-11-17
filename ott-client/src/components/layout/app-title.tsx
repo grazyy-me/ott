@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { Menu, X } from 'lucide-react'
+import { Logo } from '@/assets/logo'
 import { APP_NAME } from '@/lib/config'
 import { cn } from '@/lib/utils'
 import {
@@ -24,8 +25,9 @@ export function AppTitle() {
             <Link
               to='/dashboard'
               onClick={() => setOpenMobile(false)}
-              className='grid flex-1 text-start text-sm leading-tight'
+              className='flex flex-1 items-center gap-2 text-start text-sm leading-tight'
             >
+              <Logo className='h-6' />
               <span className='truncate font-bold'>{APP_NAME}</span>
             </Link>
             <ToggleSidebar />

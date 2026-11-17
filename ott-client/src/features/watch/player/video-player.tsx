@@ -560,7 +560,7 @@ export function VideoPlayer({
       {/* top bar */}
       <div
         className={cn(
-          'absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-background/80 to-transparent p-4 transition-opacity duration-300 sm:p-6',
+          'absolute inset-x-0 top-0 flex items-center gap-3 bg-gradient-to-b from-background/95 via-background/80 via-60% to-transparent p-4 pb-12 transition-opacity duration-300 sm:p-6 sm:pb-14',
           showControls ? 'opacity-100' : 'pointer-events-none opacity-0'
         )}
       >
@@ -626,7 +626,7 @@ export function VideoPlayer({
       {/* bottom controls */}
       <div
         className={cn(
-          'absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 via-background/50 to-transparent px-4 pt-16 pb-4 transition-opacity duration-300 sm:px-6',
+          'absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/95 via-background/80 via-60% to-transparent px-4 pt-20 pb-4 transition-opacity duration-300 sm:px-6',
           showControls ? 'opacity-100' : 'pointer-events-none opacity-0'
         )}
       >
@@ -637,7 +637,7 @@ export function VideoPlayer({
             buffered={buffered}
             onSeek={seekTo}
           />
-          <span className='shrink-0 text-sm text-foreground/80 tabular-nums'>
+          <span className='shrink-0 text-sm text-foreground/90 tabular-nums'>
             {formatTime(time)} / {formatTime(duration)}
           </span>
         </div>

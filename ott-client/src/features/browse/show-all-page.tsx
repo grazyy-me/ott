@@ -1,5 +1,6 @@
 import { useParams, useSearchParams } from 'react-router'
 import type { RailKey, TitleType } from '@/types/catalog'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { FilterBar } from '@/components/stream/filter-bar'
 import { FILTER_KEYS, readFilters } from '@/components/stream/filter-state'
 import { RAIL_TITLES } from '@/components/stream/rail-layout'
@@ -18,6 +19,9 @@ const PERSONAL: RailKey[] = [
 /** /browse/:key?type=: every title of one rail as an infinite grid, with the FilterBar */
 export function ShowAllPage() {
   const { key } = useParams()
+  useDocumentTitle(
+    key && key in RAIL_TITLES ? RAIL_TITLES[key as RailKey] : 'Not found'
+  )
   const [params, setParams] = useSearchParams()
   const typeParam = params.get('type') as TitleType | null
   const type = typeParam && TYPES.includes(typeParam) ? typeParam : undefined

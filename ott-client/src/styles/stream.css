@@ -39,7 +39,9 @@ html[data-surface='stream'] {
   );
 
   /* glass panels */
-  --glass-bg: oklch(0.2 0.015 275 / 55%);
+  --glass-bg: oklch(
+    0.2 0.015 275 / 72%
+  ); /* 72%: small text on glass keeps 4.5:1 even over a white backdrop */
   --glass-bg-strong: oklch(0.17 0.015 275 / 82%);
   --glass-border: oklch(1 0 0 / 10%);
   --glass-highlight: oklch(1 0 0 / 14%);
@@ -49,14 +51,16 @@ html[data-surface='stream'] {
   --scrim-bottom: linear-gradient(
     to top,
     var(--background) 0%,
-    oklch(0.13 0.012 275 / 75%) 30%,
-    transparent 70%
+    oklch(0.13 0.012 275 / 88%) 35%,
+    oklch(0.13 0.012 275 / 55%) 60%,
+    transparent 85%
   );
   --scrim-left: linear-gradient(
     to right,
-    oklch(0.13 0.012 275 / 92%) 0%,
-    oklch(0.13 0.012 275 / 55%) 40%,
-    transparent 75%
+    oklch(0.13 0.012 275 / 95%) 0%,
+    oklch(0.13 0.012 275 / 78%) 35%,
+    oklch(0.13 0.012 275 / 40%) 60%,
+    transparent 80%
   );
 
   --grain-opacity: 0.06;
@@ -199,4 +203,28 @@ html[data-motion='reduce'] .skeleton {
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 0.3s;
+}
+
+/* Touch screens: every control is at least 44×44 px; inline text links are exempt. */
+@media (pointer: coarse) {
+  :is(
+    button,
+    select,
+    summary,
+    [role='button'],
+    [role='tab'],
+    [role='radio'],
+    [role='switch'],
+    [role='slider'],
+    a.flex,
+    a.inline-flex
+  ) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* text fields too, on every surface (the kit's auth and admin forms use 36px inputs) */
+  input:not([type='checkbox'], [type='radio'], [type='range'], [type='hidden']),
+  textarea {
+    min-height: 44px;
+  }
 }

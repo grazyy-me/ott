@@ -167,6 +167,28 @@ export const router = createBrowserRouter([
           // the old footer link
           { path: '/plans', element: <Navigate to='/pricing' replace /> },
           {
+            path: '/search',
+            lazy: async () => ({
+              Component: (await import('@/features/search/search-page'))
+                .SearchPage,
+            }),
+          },
+          // legal pages (drafts: see features/legal)
+          ...(['terms', 'privacy', 'refunds'] as const).map((page) => ({
+            path: `/${page}`,
+            lazy: async () => {
+              const legal = await import('@/features/legal/legal-pages')
+              return {
+                Component:
+                  page === 'terms'
+                    ? legal.TermsPage
+                    : page === 'privacy'
+                      ? legal.PrivacyPage
+                      : legal.RefundsPage,
+              }
+            },
+          })),
+          {
             element: <ProtectedRoute />,
             children: [
               {
@@ -174,6 +196,13 @@ export const router = createBrowserRouter([
                 lazy: async () => ({
                   Component: (await import('@/features/billing/account-page'))
                     .AccountPage,
+                }),
+              },
+              {
+                path: '/my-list',
+                lazy: async () => ({
+                  Component: (await import('@/features/my-list/my-list-page'))
+                    .MyListPage,
                 }),
               },
             ],

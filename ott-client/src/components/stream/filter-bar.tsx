@@ -149,7 +149,7 @@ export function FilterBar({
           role='radiogroup'
           aria-label='Sort'
           // full width on phones (it wraps under the dropdowns); pushed right once it fits on one line
-          className='flex h-10 w-full items-center rounded-full glass p-1 sm:ml-auto sm:w-auto'
+          className='flex min-h-10 w-full items-center rounded-full glass p-1 sm:ml-auto sm:w-auto'
         >
           {SORTS.map((s) => {
             const active = sort === s.value

@@ -27,6 +27,7 @@ export function YouTubeTrailer({
   onVisibleChange,
   onEnded,
   onError,
+  cover = false,
   className,
 }: {
   videoKey: string
@@ -37,6 +38,8 @@ export function YouTubeTrailer({
   onVisibleChange?: (visible: boolean) => void
   onEnded?: () => void
   onError?: () => void
+  /** Fill the box like `object-fit: cover`, so YouTube draws no letterbox bars */
+  cover?: boolean
   className?: string
 }) {
   const host = useRef<HTMLDivElement>(null)
@@ -159,7 +162,10 @@ export function YouTubeTrailer({
       ref={host}
       aria-hidden={preview || undefined}
       className={cn(
-        'overflow-hidden transition-opacity duration-700 [&>iframe]:size-full [&>iframe]:border-0',
+        'overflow-hidden transition-opacity duration-700 [&>iframe]:border-0',
+        cover
+          ? '[container-type:size] [&>iframe]:absolute [&>iframe]:top-1/2 [&>iframe]:left-1/2 [&>iframe]:h-[max(100cqh,56.25cqw)] [&>iframe]:w-[max(100cqw,177.78cqh)] [&>iframe]:-translate-x-1/2 [&>iframe]:-translate-y-1/2'
+          : '[&>iframe]:size-full',
         preview ? 'pointer-events-none scale-[1.22]' : 'pointer-events-auto',
         visible ? 'opacity-100' : 'opacity-0',
         className

@@ -22,6 +22,7 @@ import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
+  Info,
   Pause,
   Play,
   X,
@@ -82,6 +83,11 @@ export interface CoverflowCarouselProps {
   className?: string
   style?: CSSProperties
   onSelect?: (item: CoverflowItem, index: number) => void
+  /**
+   * Clicking the centre card calls this (e.g. to open the title's details) instead of the trailer dialog.
+   * `card` holds the picture, marked `data-title-media`, for a morph.
+   */
+  onOpen?: (item: CoverflowItem, index: number, card: HTMLElement) => void
 }
 
 const wrap = (value: number, length: number) =>
@@ -115,6 +121,7 @@ export function CoverflowCarousel({
   className,
   style,
   onSelect,
+  onOpen,
 }: CoverflowCarouselProps) {
   const { reduced } = useMotion()
   const [index, setIndex] = useState(
@@ -339,17 +346,22 @@ export function CoverflowCarousel({
               data-active={selected || undefined}
               tabIndex={selected ? 0 : -1}
               aria-label={
-                selected
-                  ? item.trailerUrl
-                    ? `Watch ${item.title} trailer`
-                    : `Preview ${item.title}`
-                  : `Select ${item.title}`
+                selected && onOpen
+                  ? `More info: ${item.title}`
+                  : selected
+                    ? item.trailerUrl
+                      ? // starts with the visible words, so voice control can say what it sees
+                        `Watch trailer: ${item.title}`
+                      : `Preview ${item.title}`
+                    : `Select ${item.title}`
               }
               aria-current={selected ? 'true' : undefined}
               aria-hidden={offstage || undefined}
-              onClick={() => {
+              onClick={(event) => {
                 if (performance.now() < suppressClickUntil.current) return
-                if (selected) open(item)
+                if (selected && onOpen)
+                  onOpen(item, wrap(slot, items.length), event.currentTarget)
+                else if (selected) open(item)
                 else select(index + d)
               }}
               style={
@@ -366,12 +378,19 @@ export function CoverflowCarousel({
                 <img
                   src={item.image}
                   alt=''
+                  data-title-media={selected || undefined}
                   draggable={false}
                   loading={Math.abs(d) < 2 ? 'eager' : 'lazy'}
                   decoding='async'
                 />
                 <span className='gc-poster-shade' aria-hidden='true' />
-                {item.trailerUrl && (
+                {/* the centre card's chip: More info when it opens details, Watch trailer otherwise */}
+                {selected && onOpen && (
+                  <span className='gc-watch' aria-hidden='true'>
+                    <Info size={14} /> More info
+                  </span>
+                )}
+                {item.trailerUrl && selected && !onOpen && (
                   <span className='gc-watch' aria-hidden='true'>
                     <Play size={13} fill='currentColor' strokeWidth={0} /> Watch
                     trailer

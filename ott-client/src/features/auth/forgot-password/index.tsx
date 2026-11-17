@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import {
   Card,
   CardContent,
@@ -11,6 +12,7 @@ import { AuthLayout } from '../auth-layout'
 import { ForgotPasswordForm } from './components/forgot-password-form'
 
 export function ForgotPassword() {
+  useDocumentTitle('Reset your password')
   return (
     <AuthLayout>
       <Card className='max-w-sm gap-4 sm:min-w-sm'>

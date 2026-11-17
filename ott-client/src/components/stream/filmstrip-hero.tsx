@@ -13,6 +13,8 @@
  *   a lower strength so film art keeps its own colour.
  * - First paint is immediate (no fade or wipe on the first backdrop and title), so it never delays LCP.
  * - Autoplay pauses on hover, focus, drag, a hidden tab and when the hero is scrolled away.
+ * - The focused title's trailer plays muted behind the copy once the slide settles, holding the slideshow
+ *   until it ends. Off with reduced motion, Save-Data or the pause button.
  * Reduced motion: no autoplay, no slow zoom, no slide; changes are instant.
  */
 import {
@@ -21,12 +23,15 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
   type RefObject,
 } from 'react'
 import { animate, stagger, utils } from 'animejs'
+import { Pause, Play, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMotion, useParallax } from '@/components/motion'
+import { YouTubeTrailer } from './trailer/youtube-trailer'
 
 export interface FilmstripItem {
   id: string
@@ -41,6 +46,8 @@ export interface FilmstripItem {
   meta?: string[]
   /** One or two sentences under the title */
   overview?: string
+  /** YouTube video key of the trailer that plays behind the copy */
+  trailerKey?: string
 }
 
 interface FilmstripHeroProps {
@@ -52,6 +59,10 @@ interface FilmstripHeroProps {
   autoplayDelay?: number
   /** Buttons for the focused title, e.g. "More info" */
   actions?: (item: FilmstripItem) => ReactNode
+  /** Clicking the focused card calls this, e.g. to open the details. `card` holds the poster to morph from. */
+  onOpen?: (item: FilmstripItem, card: HTMLElement) => void
+  /** Play the focused title's trailer in the background (default true) */
+  trailers?: boolean
   /** A layer between the backdrop and the copy, e.g. the Three.js HeroAtmosphere */
   atmosphere?: ReactNode
   /**
@@ -76,6 +87,15 @@ const GRADES = [
 const WHEEL_THRESHOLD = 60
 const WHEEL_COOLDOWN = 420
 const FADE_MS = 700
+
+/** How long a slide stays put before its trailer starts loading (fast browsing creates no iframes) */
+const TRAILER_DELAY = 1200
+
+const saveData = () =>
+  Boolean(
+    (navigator as Navigator & { connection?: { saveData?: boolean } })
+      .connection?.saveData
+  )
 
 const clamp = (n: number, min: number, max: number) =>
   Math.min(max, Math.max(min, n))
@@ -135,6 +155,8 @@ export function FilmstripHero({
   autoplay = true,
   autoplayDelay = 7000,
   actions,
+  onOpen,
+  trailers = true,
   atmosphere,
   parallaxTrigger,
   className,
@@ -178,11 +200,17 @@ export function FilmstripHero({
   // the backdrop that is fading out under the new one
   const [previous, setPrevious] = useState<number | null>(null)
   const [paused, setPaused] = useState(false)
+  // the viewer's own pause (the button), separate from the hover / focus pause
+  const [stopped, setStopped] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [inView, setInView] = useState(true)
   const [pageVisible, setPageVisible] = useState(true)
   // the slide shown at first paint: it skips the fade and title wipe
   const [firstIndex] = useState(index)
+  // background trailer: which slide has settled long enough to load one, whether it shows, and its sound
+  const [settledId, setSettledId] = useState<string | null>(null)
+  const [trailerVisible, setTrailerVisible] = useState(false)
+  const [muted, setMuted] = useState(true)
 
   const fullH = clamp(box.h * CARD_H, 110, 360)
   const halfH = fullH / 2
@@ -332,9 +360,11 @@ export function FilmstripHero({
       !autoplay ||
       reduced ||
       paused ||
+      stopped ||
       dragging ||
       !inView ||
       !pageVisible ||
+      trailerVisible ||
       items.length < 2
     )
       return
@@ -348,14 +378,23 @@ export function FilmstripHero({
     autoplayDelay,
     reduced,
     paused,
+    stopped,
     dragging,
     inView,
     pageVisible,
+    trailerVisible,
     items.length,
     index,
     last,
     go,
   ])
+
+  const activeId = items[index]?.id
+  useEffect(() => {
+    if (!activeId) return
+    const id = window.setTimeout(() => setSettledId(activeId), TRAILER_DELAY)
+    return () => window.clearTimeout(id)
+  }, [activeId])
 
   // drag the strip with a pointer; a flick carries further
   const drag = useRef<{
@@ -423,6 +462,15 @@ export function FilmstripHero({
 
   const active = items[index]
   if (!active) return null
+  const showTrailer =
+    trailers &&
+    Boolean(active.trailerKey) &&
+    !reduced &&
+    !stopped &&
+    inView &&
+    pageVisible &&
+    settledId === active.id &&
+    !saveData()
   const layers =
     previous !== null && previous !== index ? [previous, index] : [index]
 
@@ -469,6 +517,18 @@ export function FilmstripHero({
             reduced={reduced}
           />
         ))}
+        {showTrailer && active.trailerKey && (
+          <YouTubeTrailer
+            key={active.id}
+            videoKey={active.trailerKey}
+            title={active.title}
+            muted={muted}
+            onVisibleChange={setTrailerVisible}
+            onEnded={() => go(index === last ? 0 : index + 1)}
+            cover
+            className='absolute inset-0'
+          />
+        )}
       </div>
 
       {/* one shared colour grade over whichever backdrops are showing: keeps the pictures' light and dark,
@@ -477,22 +537,36 @@ export function FilmstripHero({
       <div
         aria-hidden='true'
         className={cn(
-          'absolute inset-0 opacity-25 mix-blend-color',
-          !reduced && 'transition-[background-color] duration-700'
+          'absolute inset-0 mix-blend-color',
+          !reduced && 'transition-[background-color,opacity] duration-700',
+          // a playing trailer keeps its own colour
+          trailerVisible ? 'opacity-0' : 'opacity-25'
         )}
         style={{ backgroundColor: GRADES[index % GRADES.length] }}
       />
 
       {atmosphere}
 
-      {/* legibility: under the navbar, behind the copy, and into the page below */}
+      {/* legibility kept local: a soft oval behind the copy, no hard edges */}
       <div
         aria-hidden='true'
-        className='absolute inset-0 bg-gradient-to-b from-background/70 via-transparent to-background'
+        className='absolute inset-0 bg-gradient-to-b from-background/45 from-0% via-transparent via-25% to-transparent'
       />
       <div
         aria-hidden='true'
-        className='absolute inset-0 scrim-left opacity-70'
+        className='absolute inset-0 bg-[radial-gradient(ellipse_130%_46%_at_40%_47%,var(--hero-shade-strong)_0%,var(--hero-shade)_50%,transparent_100%)] md:bg-[radial-gradient(ellipse_46%_48%_at_22%_42%,var(--hero-shade-strong)_0%,var(--hero-shade)_55%,transparent_100%)]'
+        style={
+          {
+            '--hero-shade-strong':
+              'color-mix(in oklch, var(--background) 82%, transparent)',
+            '--hero-shade':
+              'color-mix(in oklch, var(--background) 66%, transparent)',
+          } as CSSProperties
+        }
+      />
+      <div
+        aria-hidden='true'
+        className='absolute inset-x-0 bottom-0 h-[38%] bg-gradient-to-t from-background via-background/40 to-transparent'
       />
 
       {/* title block, sitting just above the strip */}
@@ -501,14 +575,26 @@ export function FilmstripHero({
         className='absolute inset-x-0 top-0 flex shell flex-col justify-end pb-[3svh]'
         style={{ height: `${STRIP_TOP * 100}%` }}
       >
-        <div className='flex w-full flex-wrap items-end gap-x-12 gap-y-4'>
+        <div className='relative flex w-full flex-wrap items-end gap-x-12 gap-y-4'>
           <div className='max-w-3xl min-w-0' aria-live='polite'>
-            {active.eyebrow && (
+            {(active.eyebrow || active.meta?.length) && (
+              // type and facts on one line, so nothing sits alone over the bright side of the picture
               <p
                 data-hero-detail
-                className='mb-4 text-eyebrow font-semibold text-foreground/80 uppercase'
+                className='mb-4 flex flex-wrap gap-x-2.5 text-eyebrow font-semibold text-foreground/85 uppercase'
               >
-                {active.eyebrow}
+                {[active.eyebrow, ...(active.meta ?? [])]
+                  .filter(Boolean)
+                  .map((fact, i) => (
+                    <span key={i} className='whitespace-nowrap'>
+                      {i > 0 && (
+                        <span aria-hidden='true' className='mr-2.5'>
+                          ·
+                        </span>
+                      )}
+                      {fact}
+                    </span>
+                  ))}
               </p>
             )}
             <h1
@@ -533,7 +619,7 @@ export function FilmstripHero({
               <p
                 key={`o-${active.id}`}
                 data-hero-detail
-                className='mt-4 line-clamp-2 max-w-xl text-base text-foreground/80 md:text-lg'
+                className='mt-4 line-clamp-2 max-w-xl text-base text-foreground/90 md:text-lg'
               >
                 {active.overview}
               </p>
@@ -544,22 +630,6 @@ export function FilmstripHero({
               </div>
             )}
           </div>
-          {active.meta?.length ? (
-            <ul
-              data-hero-detail
-              className='ml-auto hidden items-end gap-8 md:flex'
-              aria-label='Details'
-            >
-              {active.meta.map((fact) => (
-                <li
-                  key={fact}
-                  className='text-xs font-medium tracking-[0.14em] whitespace-nowrap text-foreground/80 uppercase'
-                >
-                  {fact}
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </div>
       </div>
 
@@ -587,11 +657,19 @@ export function FilmstripHero({
               <button
                 key={item.id}
                 type='button'
-                aria-label={focused ? item.title : `Show ${item.title}`}
+                aria-label={
+                  focused
+                    ? onOpen
+                      ? `More info: ${item.title}`
+                      : item.title
+                    : `Show ${item.title}`
+                }
                 aria-current={focused || undefined}
                 tabIndex={focused ? 0 : -1}
-                onClick={() => {
-                  if (!suppressClick.current) go(i)
+                onClick={(e) => {
+                  if (suppressClick.current) return
+                  if (focused && onOpen) onOpen(item, e.currentTarget)
+                  else go(i)
                 }}
                 // every card is full height; the half-height look is a clip, so a focus change never
                 // re-lays out the strip (paint only), and the clipped half can't be clicked
@@ -609,6 +687,7 @@ export function FilmstripHero({
                 <img
                   src={item.poster}
                   alt=''
+                  data-title-media={focused || undefined}
                   draggable={false}
                   loading={Math.abs(i - index) < 4 ? 'eager' : 'lazy'}
                   decoding='async'
@@ -640,9 +719,41 @@ export function FilmstripHero({
         </div>
       </div>
 
-      {/* position rail */}
-      <div className='absolute inset-x-0 bottom-[3svh] shell'>
-        <div className='w-40 sm:w-56'>
+      {/* position rail, with the pause control for autoplay (anything moving longer than 5s needs one) */}
+      <div className='absolute inset-x-0 bottom-[3svh] flex shell items-end gap-4'>
+        {autoplay && !reduced && items.length > 1 && (
+          <button
+            type='button'
+            onClick={() => setStopped((s) => !s)}
+            aria-pressed={stopped}
+            aria-label={stopped ? 'Resume slideshow' : 'Pause slideshow'}
+            className='flex size-11 shrink-0 items-center justify-center rounded-full glass transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring'
+          >
+            {stopped ? (
+              <Play
+                aria-hidden='true'
+                className='size-4 translate-x-px fill-current'
+              />
+            ) : (
+              <Pause aria-hidden='true' className='size-4 fill-current' />
+            )}
+          </button>
+        )}
+        {showTrailer && trailerVisible && (
+          <button
+            type='button'
+            onClick={() => setMuted((m) => !m)}
+            aria-label={muted ? 'Unmute trailer' : 'Mute trailer'}
+            className='flex size-11 shrink-0 items-center justify-center rounded-full glass transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring'
+          >
+            {muted ? (
+              <VolumeX aria-hidden='true' className='size-4' />
+            ) : (
+              <Volume2 aria-hidden='true' className='size-4' />
+            )}
+          </button>
+        )}
+        <div className='w-40 pb-1 sm:w-56'>
           <div className='flex justify-between text-xs font-medium text-foreground/80 tabular-nums'>
             <span>{String(index + 1).padStart(2, '0')}</span>
             <span>{String(items.length).padStart(2, '0')}</span>

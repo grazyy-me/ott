@@ -10,6 +10,7 @@ import { Clapperboard, Volume2, VolumeX, X } from 'lucide-react'
 import { countryName, languageName } from '@/lib/locale-names'
 import { formatRuntime, lengthLabel, ratingLabel } from '@/lib/title-format'
 import { tmdbImage } from '@/lib/tmdb-image'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { cn } from '@/lib/utils'
 import { Reveal, useMotion } from '@/components/motion'
 import { MyListButton, PlayButton } from '@/components/stream/title-actions'
@@ -74,6 +75,7 @@ export function TitleDetail({
   const { reduced } = useMotion()
   // the hero (and its backdrop) only exists once there is something to show
   const heroReady = Boolean(t)
+  useDocumentTitle(t?.title)
 
   // the backdrop moves slower than the content as you scroll (the modal's own scroller, or the page);
   // the transform is written straight from the scroll event. Off with reduced motion.
@@ -221,10 +223,7 @@ export function TitleDetail({
           aria-hidden='true'
           className='absolute inset-0 -z-10 scrim-bottom'
         />
-        <div
-          aria-hidden='true'
-          className='absolute inset-0 -z-10 scrim-left opacity-80'
-        />
+        <div aria-hidden='true' className='absolute inset-0 -z-10 scrim-left' />
 
         <div
           className={cn(

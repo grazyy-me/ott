@@ -12,6 +12,7 @@ import { Link, NavLink, useLocation } from 'react-router'
 import { animate } from 'animejs'
 import { AnimatePresence, m } from 'framer-motion'
 import { Bookmark, LogOut, Search, UserRound } from 'lucide-react'
+import { Logo } from '@/assets/logo'
 import { useAppSelector } from '@/app/hooks'
 import { APP_NAME } from '@/lib/config'
 import { cn } from '@/lib/utils'
@@ -338,10 +339,7 @@ export function StreamNav() {
             to='/'
             className='flex items-center gap-2.5 rounded-full py-1 pr-3 pl-1 transition-opacity outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring'
           >
-            <span
-              aria-hidden='true'
-              className='size-8 shrink-0 rounded-full bg-stream-gradient'
-            />
+            <Logo className='h-8' />
             <span className='font-display text-lg font-bold tracking-tight'>
               {APP_NAME}
             </span>

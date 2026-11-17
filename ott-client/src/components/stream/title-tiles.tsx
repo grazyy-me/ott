@@ -96,7 +96,7 @@ export function LandscapeTile({
         )}
         <div
           aria-hidden='true'
-          className='absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent'
+          className='absolute inset-0 bg-gradient-to-t from-background from-10% via-background/80 via-50% to-transparent'
         />
         {variant === 'coming' && <Badge>{releaseLabel(t.releaseDate)}</Badge>}
         {variant === 'default' && t.awards?.[0] && <Badge>{t.awards[0]}</Badge>}

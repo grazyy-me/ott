@@ -24,10 +24,26 @@
     overflow: unset !important;
   }
 
-  /* Cursor pointer for buttons */
+  /* Pointer cursor on every enabled control (Tailwind's preflight resets buttons to the arrow) */
   button:not(:disabled),
-  [role='button']:not(:disabled) {
+  [role='button']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  [role='radio']:not([aria-disabled='true']),
+  [role='switch']:not([aria-disabled='true']),
+  [role='option']:not([aria-disabled='true']),
+  [role='menuitem']:not([data-disabled]),
+  select:not(:disabled),
+  summary,
+  label[for],
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled) {
     cursor: pointer;
+  }
+  button:disabled,
+  select:disabled,
+  input:disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
   }
 
   /* Prevent focus zoom on mobile devices */

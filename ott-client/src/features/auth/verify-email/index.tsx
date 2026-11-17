@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router'
 import { CircleCheck, CircleX, Loader2 } from 'lucide-react'
 import { useAppSelector } from '@/app/hooks'
 import { getErrorMessage } from '@/lib/handle-server-error'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useVerifyEmailMutation } from '@/features/auth/auth-api'
@@ -11,6 +12,7 @@ import { AuthLayout } from '../auth-layout'
 
 /** Opened from the link in the verification email; works signed in or out */
 export function VerifyEmail() {
+  useDocumentTitle('Verify your email')
   const [params] = useSearchParams()
   const token = params.get('token')
   const status = useAppSelector(selectAuthStatus)

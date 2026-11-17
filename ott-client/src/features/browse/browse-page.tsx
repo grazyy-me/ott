@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router'
 import type { TitleType } from '@/types/catalog'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { Reveal } from '@/components/motion'
 import { FilterBar } from '@/components/stream/filter-bar'
 import {
@@ -57,6 +58,7 @@ export function BrowseHeader({
  * an infinite grid of everything of that type that matches instead.
  */
 export function BrowsePage({ type }: { type: TitleType }) {
+  useDocumentTitle(BROWSE_COPY[type].title)
   const [params, setParams] = useSearchParams()
   const filters = readFilters(params)
   const filtering = hasFilters(filters) || Boolean(filters.sort)

@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { KeyRound, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/handle-server-error'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { passwordSchema } from '@/lib/validation'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,6 +39,7 @@ const formSchema = z
   })
 
 export function ResetPassword() {
+  useDocumentTitle('Choose a new password')
   const [params] = useSearchParams()
   const token = params.get('token')
   const navigate = useNavigate()

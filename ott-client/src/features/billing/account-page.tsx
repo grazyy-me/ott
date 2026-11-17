@@ -3,6 +3,7 @@ import { formatRupees, type BillingSummary } from '@/types/billing'
 import { ArrowRight, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppSelector } from '@/app/hooks'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { cn } from '@/lib/utils'
 import {
   AlertDialog,
@@ -29,7 +30,7 @@ const dateLabel = (iso: string | null) =>
         month: 'long',
         year: 'numeric',
       })
-    : '—'
+    : 'Not available'
 
 const STATUS: Record<string, { label: string; tone: 'ok' | 'warn' | 'off' }> = {
   created: { label: 'Awaiting payment', tone: 'warn' },
@@ -235,7 +236,7 @@ function Payments({ payments }: { payments: BillingSummary['payments'] }) {
                   {formatRupees(p.amountPaise)}
                 </td>
                 <td className='hidden py-3 capitalize sm:table-cell'>
-                  {p.method ?? '—'}
+                  {p.method ?? 'Not recorded'}
                 </td>
                 <td className='py-3 text-right capitalize'>{p.status}</td>
               </tr>
@@ -249,6 +250,7 @@ function Payments({ payments }: { payments: BillingSummary['payments'] }) {
 
 /** /account (signed in): plan, status, renewal or end date, cancel, payment history, link to profile settings */
 export function AccountPage() {
+  useDocumentTitle('Your account')
   const user = useAppSelector(selectCurrentUser)
   const { data, isLoading, isError, refetch } = useGetBillingMeQuery()
 

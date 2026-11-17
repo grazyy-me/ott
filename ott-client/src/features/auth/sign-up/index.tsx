@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import {
   Card,
   CardContent,
@@ -10,6 +11,7 @@ import { AuthLayout } from '../auth-layout'
 import { SignUpForm } from './components/sign-up-form'
 
 export function SignUp() {
+  useDocumentTitle('Create an account')
   return (
     <AuthLayout>
       <Card className='max-w-sm gap-4 sm:min-w-sm'>

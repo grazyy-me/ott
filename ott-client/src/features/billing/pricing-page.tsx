@@ -1,5 +1,6 @@
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import type { PlanCode } from '@/types/billing'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { PricingPlans } from '@/components/stream/pricing-plans'
 import { BrowseHeader } from '@/features/browse/browse-page'
 import { useEntitlement, useGetPlansQuery } from './billing-api'
@@ -10,6 +11,7 @@ import { useCheckout } from './use-checkout'
  * Razorpay checkout (signing in first if needed) and goes on to `next` (or the account page) once paid.
  */
 export function PricingPage() {
+  useDocumentTitle('Plans')
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const billing: PlanCode =
@@ -74,7 +76,21 @@ export function PricingPage() {
         <p className='mx-auto mt-10 max-w-xl text-center text-sm text-muted-foreground'>
           Payments are handled by Razorpay. Your plan renews automatically until
           you cancel; after cancelling you keep watching until the end of the
-          period you paid for.
+          period you paid for. See the{' '}
+          <Link
+            to='/terms'
+            className='underline underline-offset-4 hover:text-foreground'
+          >
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link
+            to='/refunds'
+            className='underline underline-offset-4 hover:text-foreground'
+          >
+            refunds and cancellation
+          </Link>
+          .
         </p>
       </section>
     </>

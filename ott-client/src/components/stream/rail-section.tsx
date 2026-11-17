@@ -9,6 +9,7 @@ import { CoverflowCarousel } from './coverflow-carousel'
 import { RAIL_LAYOUT, showAllHref, type RailLayout } from './rail-layout'
 import { LandscapeTile, PosterTile } from './title-tiles'
 import { TopTenRail } from './top-ten-rail'
+import { useOpenTitle } from './use-title-link'
 
 const ROW =
   'shell no-scrollbar mt-6 flex snap-x scroll-px-[clamp(1.25rem,4vw,3rem)] overflow-x-auto pb-4'
@@ -86,6 +87,7 @@ export function RailSection({
   layout?: RailLayout
 }) {
   const kind = layout ?? RAIL_LAYOUT[rail.key]
+  const openTitle = useOpenTitle()
   // personal rails have no "Show all" beyond what they show; the others open the infinite grid
   const href =
     rail.key === 'continue-watching' ? undefined : showAllHref(rail.key, type)
@@ -100,6 +102,11 @@ export function RailSection({
           initialIndex={Math.min(2, rail.items.length - 1)}
           className='mt-2'
           style={{ height: '70svh', minHeight: 480, maxHeight: 760 }}
+          // the centre card opens the details modal, which plays the trailer itself
+          onOpen={(item, _index, card) => {
+            const title = rail.items.find((t) => t.id === item.id)
+            if (title) openTitle(title, card)
+          }}
           items={rail.items
             .filter((t) => t.posterUrl)
             .slice(0, 12)

@@ -4,6 +4,7 @@ import type { SubscriptionRequired } from '@/types/billing'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useAppSelector } from '@/app/hooks'
 import { tmdbImage } from '@/lib/tmdb-image'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { useMotion } from '@/components/motion'
 import { selectAuthStatus } from '@/features/auth/auth-slice'
 import { PaywallDialog } from '@/features/billing/paywall-dialog'
@@ -36,6 +37,7 @@ export function PlayerPage() {
 
   const titleQuery = useGetTitleQuery(slug)
   const detail = titleQuery.data?.data.title
+  useDocumentTitle(detail ? `Watching ${detail.title}` : 'Player')
   // wait for the session check, so a signed-in viewer isn't treated as a guest for a moment
   const playbackQuery = useGetPlaybackQuery(
     { titleId: detail?.id ?? '', episodeId },

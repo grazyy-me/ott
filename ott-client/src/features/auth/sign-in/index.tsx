@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from 'react-router'
 import { AlertCircle } from 'lucide-react'
 import { safeRedirect } from '@/lib/redirect'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Card,
@@ -20,6 +21,7 @@ const OAUTH_ERRORS: Record<string, string> = {
 }
 
 export function SignIn() {
+  useDocumentTitle('Sign in')
   const [params] = useSearchParams()
   const redirect = params.get('redirect')
   const error = params.get('error')

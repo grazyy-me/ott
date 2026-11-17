@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router'
+import { useDocumentTitle } from '@/lib/use-document-title'
 import { Button } from '@/components/ui/button'
 
 export function ForbiddenError() {
+  useDocumentTitle('Access denied')
   const navigate = useNavigate()
   return (
     <div className='h-svh'>
@@ -13,10 +15,16 @@ export function ForbiddenError() {
           to view this resource.
         </p>
         <div className='mt-6 flex gap-4'>
-          <Button variant='outline' onClick={() => navigate(-1)}>
+          <Button
+            variant='outline'
+            className='pointer-coarse:h-11'
+            onClick={() => navigate(-1)}
+          >
             Go Back
           </Button>
-          <Button onClick={() => navigate('/')}>Back to Home</Button>
+          <Button className='pointer-coarse:h-11' onClick={() => navigate('/')}>
+            Back to Home
+          </Button>
         </div>
       </div>
     </div>

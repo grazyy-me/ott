@@ -105,7 +105,7 @@ export function InteractiveSelector({
               <span
                 aria-hidden='true'
                 className={cn(
-                  'absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent',
+                  'absolute inset-0 bg-gradient-to-t from-background from-10% via-background/80 via-50% to-transparent',
                   !reduced && 'transition-opacity duration-700',
                   open ? 'opacity-100' : 'opacity-60'
                 )}
